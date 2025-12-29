@@ -1,0 +1,1189 @@
+{
+	"info": {
+		"_postman_id": "dothack-api-collection-2024",
+		"name": "DotHack Hackathon Platform API",
+		"description": "Complete API collection for the DotHack Hackathon Platform. Includes endpoints for hackathons, teams, submissions, judging, and participant management.\n\n## Authentication\n\nAll endpoints (except health check) require authentication via:\n- **JWT Bearer Token**: Set in Authorization header\n- **API Key**: Set in X-API-Key header\n\n## Getting Started\n\n1. Set the `base_url` environment variable to your API URL (e.g., http://localhost:8000)\n2. Set the `auth_token` environment variable to your JWT token or API key\n3. Use the folders below to explore different API endpoints\n\n## Support\n\nFor questions or issues: hello@ainative.studio",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Health",
+			"item": [
+				{
+					"name": "Health Check",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/health",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"health"
+							]
+						},
+						"description": "Check API health status. No authentication required."
+					},
+					"response": [
+						{
+							"name": "Health Check Success",
+							"originalRequest": {
+								"method": "GET",
+								"url": {
+									"raw": "{{base_url}}/health",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"health"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\n  \"status\": \"healthy\",\n  \"timestamp\": \"2024-12-28T00:00:00.000000\"\n}"
+						}
+					]
+				}
+			],
+			"description": "System health and status endpoints"
+		},
+		{
+			"name": "Hackathons",
+			"item": [
+				{
+					"name": "Create Hackathon",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"AI Hackathon 2025\",\n  \"description\": \"Build innovative AI-powered applications\",\n  \"organizer_id\": \"{{user_id}}\",\n  \"start_date\": \"2025-03-01T09:00:00Z\",\n  \"end_date\": \"2025-03-03T18:00:00Z\",\n  \"location\": \"San Francisco, CA\",\n  \"registration_deadline\": \"2025-02-28T23:59:59Z\",\n  \"max_participants\": 100,\n  \"website_url\": \"https://aihackathon2025.com\",\n  \"prizes\": {\n    \"first\": \"$10,000\",\n    \"second\": \"$5,000\",\n    \"third\": \"$2,500\"\n  },\n  \"rules\": \"All standard hackathon rules apply. Teams must be 2-5 members.\",\n  \"status\": \"draft\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/hackathons",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"hackathons"
+							]
+						},
+						"description": "Create a new hackathon. Creator is automatically assigned ORGANIZER role."
+					},
+					"response": [
+						{
+							"name": "Create Hackathon Success",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{auth_token}}"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"name\": \"AI Hackathon 2025\",\n  \"organizer_id\": \"user-123\",\n  \"start_date\": \"2025-03-01T09:00:00Z\",\n  \"end_date\": \"2025-03-03T18:00:00Z\",\n  \"location\": \"San Francisco, CA\",\n  \"status\": \"draft\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/v1/hackathons",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"hackathons"
+									]
+								}
+							},
+							"status": "Created",
+							"code": 201,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\n  \"hackathon_id\": \"550e8400-e29b-41d4-a716-446655440000\",\n  \"name\": \"AI Hackathon 2025\",\n  \"description\": \"Build AI-powered applications\",\n  \"organizer_id\": \"user-123\",\n  \"start_date\": \"2025-03-01T09:00:00Z\",\n  \"end_date\": \"2025-03-03T18:00:00Z\",\n  \"location\": \"San Francisco, CA\",\n  \"status\": \"draft\",\n  \"created_at\": \"2025-01-15T10:00:00Z\",\n  \"updated_at\": \"2025-01-15T10:00:00Z\"\n}"
+						}
+					]
+				},
+				{
+					"name": "List Hackathons",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/hackathons?skip=0&limit=100&status=active",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"hackathons"
+							],
+							"query": [
+								{
+									"key": "skip",
+									"value": "0",
+									"description": "Pagination offset"
+								},
+								{
+									"key": "limit",
+									"value": "100",
+									"description": "Maximum results"
+								},
+								{
+									"key": "status",
+									"value": "active",
+									"description": "Filter by status (optional)"
+								}
+							]
+						},
+						"description": "List hackathons with pagination and optional status filter."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Hackathon Details",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/hackathons/{{hackathon_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"hackathons",
+								"{{hackathon_id}}"
+							]
+						},
+						"description": "Get detailed information about a specific hackathon."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Hackathon",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"AI Hackathon 2025 - Extended\",\n  \"status\": \"active\",\n  \"max_participants\": 150\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/hackathons/{{hackathon_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"hackathons",
+								"{{hackathon_id}}"
+							]
+						},
+						"description": "Update hackathon details. Requires ORGANIZER role. Only provided fields are updated."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Hackathon",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/hackathons/{{hackathon_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"hackathons",
+								"{{hackathon_id}}"
+							]
+						},
+						"description": "Soft delete a hackathon. Requires ORGANIZER role."
+					},
+					"response": []
+				}
+			],
+			"description": "Hackathon CRUD operations - Create, read, update, and delete hackathons"
+		},
+		{
+			"name": "Teams",
+			"item": [
+				{
+					"name": "Create Team",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"hackathon_id\": \"{{hackathon_id}}\",\n  \"name\": \"Team Alpha\",\n  \"description\": \"Building an AI-powered code assistant\",\n  \"track_id\": \"{{track_id}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/teams",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"teams"
+							]
+						},
+						"description": "Create a new team. Creator is automatically added as team LEAD."
+					},
+					"response": []
+				},
+				{
+					"name": "List Teams",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/teams?hackathon_id={{hackathon_id}}&status=ACTIVE&skip=0&limit=100",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"teams"
+							],
+							"query": [
+								{
+									"key": "hackathon_id",
+									"value": "{{hackathon_id}}",
+									"description": "Hackathon UUID (required)"
+								},
+								{
+									"key": "status",
+									"value": "ACTIVE",
+									"description": "Filter by status (optional)"
+								},
+								{
+									"key": "skip",
+									"value": "0"
+								},
+								{
+									"key": "limit",
+									"value": "100"
+								}
+							]
+						},
+						"description": "List teams for a hackathon with optional filtering."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Team Details",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/teams/{{team_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"teams",
+								"{{team_id}}"
+							]
+						},
+						"description": "Get detailed team information including members list."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Team",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Team Alpha - Updated\",\n  \"description\": \"Building an advanced AI code assistant\",\n  \"status\": \"SUBMITTED\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/teams/{{team_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"teams",
+								"{{team_id}}"
+							]
+						},
+						"description": "Update team details. All fields are optional."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Team",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/teams/{{team_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"teams",
+								"{{team_id}}"
+							]
+						},
+						"description": "Delete a team and all associated members. Cannot be undone."
+					},
+					"response": []
+				},
+				{
+					"name": "Add Team Member",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"participant_id\": \"{{participant_id}}\",\n  \"role\": \"MEMBER\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/teams/{{team_id}}/members",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"teams",
+								"{{team_id}}",
+								"members"
+							]
+						},
+						"description": "Add a member to a team. Role can be LEAD or MEMBER."
+					},
+					"response": []
+				},
+				{
+					"name": "Remove Team Member",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/teams/{{team_id}}/members/{{participant_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"teams",
+								"{{team_id}}",
+								"members",
+								"{{participant_id}}"
+							]
+						},
+						"description": "Remove a member from a team. Cannot remove the last LEAD."
+					},
+					"response": []
+				}
+			],
+			"description": "Team management - Form teams, add/remove members, and manage team details"
+		},
+		{
+			"name": "Submissions",
+			"item": [
+				{
+					"name": "Create Submission",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"team_id\": \"{{team_id}}\",\n  \"hackathon_id\": \"{{hackathon_id}}\",\n  \"project_name\": \"AI Code Assistant\",\n  \"description\": \"An intelligent code completion and generation tool powered by AI\",\n  \"repository_url\": \"https://github.com/team/ai-code-assistant\",\n  \"demo_url\": \"https://demo.aicode.dev\",\n  \"video_url\": \"https://youtube.com/watch?v=demo\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/v1/submissions",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"v1",
+								"submissions"
+							]
+						},
+						"description": "Create a new project submission. Submission starts in DRAFT status."
+					},
+					"response": []
+				},
+				{
+					"name": "List Submissions",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/v1/submissions?hackathon_id={{hackathon_id}}&status=SUBMITTED&skip=0&limit=100",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"v1",
+								"submissions"
+							],
+							"query": [
+								{
+									"key": "hackathon_id",
+									"value": "{{hackathon_id}}",
+									"description": "Filter by hackathon (optional)"
+								},
+								{
+									"key": "team_id",
+									"value": "{{team_id}}",
+									"description": "Filter by team (optional)",
+									"disabled": true
+								},
+								{
+									"key": "status",
+									"value": "SUBMITTED",
+									"description": "Filter by status (DRAFT, SUBMITTED, SCORED)"
+								},
+								{
+									"key": "skip",
+									"value": "0"
+								},
+								{
+									"key": "limit",
+									"value": "100"
+								}
+							]
+						},
+						"description": "List submissions with optional filters."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Submission Details",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/v1/submissions/{{submission_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"v1",
+								"submissions",
+								"{{submission_id}}"
+							]
+						},
+						"description": "Get detailed information about a specific submission."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Submission",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"project_name\": \"Advanced AI Code Assistant\",\n  \"description\": \"Updated description with new features\",\n  \"status\": \"SUBMITTED\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/v1/submissions/{{submission_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"v1",
+								"submissions",
+								"{{submission_id}}"
+							]
+						},
+						"description": "Update submission details. Only provided fields are updated."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Submission",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/v1/submissions/{{submission_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"v1",
+								"submissions",
+								"{{submission_id}}"
+							]
+						},
+						"description": "Delete a submission. Cannot delete SCORED submissions."
+					},
+					"response": []
+				},
+				{
+					"name": "Upload File to Submission",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"file_name\": \"presentation.pdf\",\n  \"file_type\": \"application/pdf\",\n  \"file_size\": 2048576,\n  \"file_content\": \"JVBERi0xLjQKJeLjz9MKMSAwIG9ia...\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/v1/submissions/{{submission_id}}/files",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"v1",
+								"submissions",
+								"{{submission_id}}",
+								"files"
+							]
+						},
+						"description": "Upload a file to a submission. File content must be base64-encoded. Max size: 100MB."
+					},
+					"response": []
+				}
+			],
+			"description": "Project submission management - Submit projects, upload files, and track status"
+		},
+		{
+			"name": "Judging",
+			"item": [
+				{
+					"name": "Submit Score",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"judge_id\": \"{{user_id}}\",\n  \"criteria\": \"Innovation\",\n  \"score\": 28.5,\n  \"comment\": \"Excellent use of AI technology and creative problem-solving\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/judging/scores?submission_id={{submission_id}}&hackathon_id={{hackathon_id}}&rubric_id={{rubric_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"judging",
+								"scores"
+							],
+							"query": [
+								{
+									"key": "submission_id",
+									"value": "{{submission_id}}",
+									"description": "UUID of submission to score"
+								},
+								{
+									"key": "hackathon_id",
+									"value": "{{hackathon_id}}",
+									"description": "UUID of hackathon"
+								},
+								{
+									"key": "rubric_id",
+									"value": "{{rubric_id}}",
+									"description": "UUID of judging rubric"
+								}
+							]
+						},
+						"description": "Submit a score for a submission. Requires JUDGE role. Score must be 0-100."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Hackathon Results",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/judging/hackathons/{{hackathon_id}}/results?top_n=10",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"judging",
+								"hackathons",
+								"{{hackathon_id}}",
+								"results"
+							],
+							"query": [
+								{
+									"key": "track_id",
+									"value": "{{track_id}}",
+									"description": "Filter by track (optional)",
+									"disabled": true
+								},
+								{
+									"key": "top_n",
+									"value": "10",
+									"description": "Limit to top N entries"
+								}
+							]
+						},
+						"description": "Get hackathon leaderboard and results based on average scores."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Judge Assignments",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/judging/assignments?hackathon_id={{hackathon_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"judging",
+								"assignments"
+							],
+							"query": [
+								{
+									"key": "hackathon_id",
+									"value": "{{hackathon_id}}",
+									"description": "UUID of hackathon"
+								}
+							]
+						},
+						"description": "Get list of submissions assigned to the authenticated judge."
+					},
+					"response": []
+				}
+			],
+			"description": "Judging and scoring - Submit scores, view leaderboards, and manage assignments"
+		},
+		{
+			"name": "Analytics",
+			"item": [
+				{
+					"name": "Get Hackathon Statistics",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/hackathons/{{hackathon_id}}/stats",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"hackathons",
+								"{{hackathon_id}}",
+								"stats"
+							]
+						},
+						"description": "Get aggregated statistics for a hackathon. Requires ORGANIZER role. Returns participant counts, team counts, submission statistics, and average scores."
+					},
+					"response": [
+						{
+							"name": "Statistics Success",
+							"originalRequest": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{auth_token}}"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/api/v1/hackathons/{{hackathon_id}}/stats",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"hackathons",
+										"{{hackathon_id}}",
+										"stats"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\n  \"hackathon_id\": \"550e8400-e29b-41d4-a716-446655440000\",\n  \"total_participants\": 42,\n  \"participants_by_role\": {\n    \"organizer\": 2,\n    \"judge\": 5,\n    \"builder\": 35\n  },\n  \"total_teams\": 8,\n  \"total_submissions\": 8,\n  \"submissions_by_status\": {\n    \"DRAFT\": 2,\n    \"SUBMITTED\": 3,\n    \"SCORED\": 3\n  },\n  \"average_scores\": {\n    \"general\": 85.5,\n    \"ai\": 92.3\n  },\n  \"calculated_at\": \"2025-12-28T10:30:00Z\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Export Hackathon Data (JSON)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/hackathons/{{hackathon_id}}/export?format=json",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"hackathons",
+								"{{hackathon_id}}",
+								"export"
+							],
+							"query": [
+								{
+									"key": "format",
+									"value": "json",
+									"description": "Export format (json or csv)"
+								}
+							]
+						},
+						"description": "Export all hackathon data in JSON format. Requires ORGANIZER role. Includes hackathon details, participants, teams, submissions, and scores."
+					},
+					"response": []
+				},
+				{
+					"name": "Export Hackathon Data (CSV)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/hackathons/{{hackathon_id}}/export?format=csv",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"hackathons",
+								"{{hackathon_id}}",
+								"export"
+							],
+							"query": [
+								{
+									"key": "format",
+									"value": "csv",
+									"description": "Export format (csv)"
+								}
+							]
+						},
+						"description": "Export all hackathon data in CSV format. Requires ORGANIZER role. Returns flattened CSV with all records."
+					},
+					"response": []
+				}
+			],
+			"description": "Analytics and data export - Get hackathon statistics and export data (ORGANIZER only)"
+		},
+		{
+			"name": "Participants",
+			"item": [
+				{
+					"name": "Join Hackathon",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/hackathons/{{hackathon_id}}/join",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"hackathons",
+								"{{hackathon_id}}",
+								"join"
+							]
+						},
+						"description": "Join a hackathon as a BUILDER participant."
+					},
+					"response": []
+				},
+				{
+					"name": "Invite Judges",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"emails\": [\n    \"judge1@example.com\",\n    \"judge2@example.com\",\n    \"judge3@example.com\"\n  ],\n  \"message\": \"You are invited to judge our AI Hackathon 2025!\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/hackathons/{{hackathon_id}}/invite-judges",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"hackathons",
+								"{{hackathon_id}}",
+								"invite-judges"
+							]
+						},
+						"description": "Invite judges to a hackathon. Requires ORGANIZER role."
+					},
+					"response": []
+				},
+				{
+					"name": "List Participants",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/hackathons/{{hackathon_id}}/participants?role=JUDGE",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"hackathons",
+								"{{hackathon_id}}",
+								"participants"
+							],
+							"query": [
+								{
+									"key": "role",
+									"value": "JUDGE",
+									"description": "Filter by role (BUILDER, ORGANIZER, JUDGE, MENTOR)"
+								}
+							]
+						},
+						"description": "List all participants in a hackathon. No authentication required."
+					},
+					"response": []
+				},
+				{
+					"name": "Leave Hackathon",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/hackathons/{{hackathon_id}}/leave",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"hackathons",
+								"{{hackathon_id}}",
+								"leave"
+							]
+						},
+						"description": "Leave a hackathon. Cannot leave after submitting a project."
+					},
+					"response": []
+				}
+			],
+			"description": "Participant operations - Join hackathons, invite judges, and manage participation"
+		}
+	],
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{auth_token}}",
+				"type": "string"
+			}
+		]
+	},
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8000",
+			"type": "string"
+		},
+		{
+			"key": "auth_token",
+			"value": "your-jwt-token-here",
+			"type": "string"
+		},
+		{
+			"key": "hackathon_id",
+			"value": "550e8400-e29b-41d4-a716-446655440000",
+			"type": "string"
+		},
+		{
+			"key": "team_id",
+			"value": "660e8400-e29b-41d4-a716-446655440001",
+			"type": "string"
+		},
+		{
+			"key": "submission_id",
+			"value": "770e8400-e29b-41d4-a716-446655440002",
+			"type": "string"
+		},
+		{
+			"key": "user_id",
+			"value": "880e8400-e29b-41d4-a716-446655440003",
+			"type": "string"
+		},
+		{
+			"key": "participant_id",
+			"value": "990e8400-e29b-41d4-a716-446655440004",
+			"type": "string"
+		},
+		{
+			"key": "track_id",
+			"value": "aa0e8400-e29b-41d4-a716-446655440005",
+			"type": "string"
+		},
+		{
+			"key": "rubric_id",
+			"value": "bb0e8400-e29b-41d4-a716-446655440006",
+			"type": "string"
+		}
+	]
+}
