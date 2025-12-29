@@ -262,6 +262,65 @@ class FileUploadResponse(BaseModel):
         from_attributes = True
 
 
+# Similar Submissions Schemas
+class SimilarSubmissionItem(BaseModel):
+    """
+    Individual similar submission with similarity score.
+
+    Attributes:
+        submission_id: UUID of the similar submission
+        team_id: UUID of the team
+        hackathon_id: UUID of the hackathon
+        project_name: Name of the project
+        description: Project description
+        status: Submission status
+        similarity_score: Similarity score (0.0 - 1.0, higher is more similar)
+        created_at: When submission was created
+    """
+
+    submission_id: str = Field(..., description="Submission ID")
+    team_id: str = Field(..., description="Team ID")
+    hackathon_id: str = Field(..., description="Hackathon ID")
+    project_name: str = Field(..., description="Project name")
+    description: str = Field(..., description="Project description")
+    status: SubmissionStatus = Field(..., description="Submission status")
+    similarity_score: float = Field(
+        ...,
+        ge=0.0,
+        le=1.0,
+        description="Similarity score (0.0-1.0, higher is more similar)",
+    )
+    created_at: datetime = Field(..., description="Creation timestamp")
+    repository_url: Optional[str] = Field(None, description="Git repository URL")
+    demo_url: Optional[str] = Field(None, description="Live demo URL")
+
+    class Config:
+        from_attributes = True
+
+
+class SimilarSubmissionsResponse(BaseModel):
+    """
+    Response containing similar submissions.
+
+    Attributes:
+        submission_id: The query submission ID
+        similar_submissions: List of similar submissions sorted by similarity score
+        total_found: Total number of similar submissions found
+        execution_time_ms: Search execution time in milliseconds
+    """
+
+    submission_id: str = Field(..., description="Query submission ID")
+    similar_submissions: List[SimilarSubmissionItem] = Field(
+        ...,
+        description="Similar submissions sorted by relevance (highest score first)",
+    )
+    total_found: int = Field(..., description="Total number of similar submissions found")
+    execution_time_ms: Optional[float] = Field(
+        None,
+        description="Search execution time in milliseconds",
+    )
+
+
 # Error Response Schema
 class ErrorResponse(BaseModel):
     """

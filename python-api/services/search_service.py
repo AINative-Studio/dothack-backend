@@ -1,459 +1,260 @@
 """
-Search Service for Semantic Submission Search
+Search Service
 
-Provides semantic search functionality to find similar hackathon submissions
-using natural language queries and vector similarity. Leverages ZeroDB's
-embedding generation and vector search capabilities.
+Provides semantic search functionality across hackathons, submissions, projects, and teams.
+Uses ZeroDB embeddings API for natural language search with < 200ms target response time.
 """
 
 import logging
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+import time
+from typing import Any, Optional
 
+from fastapi import HTTPException, status
 from integrations.zerodb.client import ZeroDBClient
-from integrations.zerodb.exceptions import (
-    ZeroDBError,
-    ZeroDBNotFound,
-    ZeroDBTimeoutError,
-)
+from integrations.zerodb.exceptions import ZeroDBError, ZeroDBTimeoutError
 
-# Configure logger
 logger = logging.getLogger(__name__)
-
-# Default embedding model
-DEFAULT_EMBEDDING_MODEL = "BAAI/bge-small-en-v1.5"
-
-
-@dataclass
-class SearchResult:
-    """
-    Search result with submission data and similarity score.
-
-    Attributes:
-        submission_id: Unique identifier for the submission
-        hackathon_id: Hackathon the submission belongs to
-        title: Project title/name
-        description: Project description
-        similarity_score: Cosine similarity score (0.0 - 1.0)
-        metadata: Additional submission metadata (track, status, etc.)
-    """
-    submission_id: str
-    hackathon_id: str
-    title: str
-    description: str
-    similarity_score: float
-    metadata: Dict[str, Any] = field(default_factory=dict)
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert SearchResult to dictionary"""
-        return {
-            "submission_id": self.submission_id,
-            "hackathon_id": self.hackathon_id,
-            "title": self.title,
-            "description": self.description,
-            "similarity_score": self.similarity_score,
-            "metadata": self.metadata,
-        }
 
 
 class SearchService:
-    """
-    Service for semantic search of hackathon submissions.
+    """Service for semantic search operations."""
 
-    Provides methods for:
-    - Natural language search queries
-    - Finding similar submissions
-    - Filtering by hackathon, track, and status
-    - Ranking results by similarity score
-
-    Example:
-        >>> service = SearchService(zerodb_client)
-        >>> results = await service.search_by_query(
-        ...     query="AI healthcare solutions",
-        ...     hackathon_id="hack-123",
-        ...     top_k=10
-        ... )
-    """
-
-    def __init__(
-        self,
-        zerodb_client: ZeroDBClient,
-        model: str = DEFAULT_EMBEDDING_MODEL
-    ):
+    def __init__(self, zerodb_client: ZeroDBClient):
         """
-        Initialize SearchService.
+        Initialize search service.
 
         Args:
             zerodb_client: ZeroDB client instance
-            model: Embedding model to use (default: BAAI/bge-small-en-v1.5)
         """
-        self.client = zerodb_client
-        self.model = model
-        logger.info(f"SearchService initialized with model: {model}")
+        self.zerodb = zerodb_client
 
-    async def search_by_query(
+    async def search_all(
         self,
         query: str,
-        hackathon_id: str,
-        top_k: int = 10,
-        filters: Optional[Dict[str, Any]] = None,
-        min_similarity: float = 0.5
-    ) -> List[SearchResult]:
+        entity_type: Optional[str] = None,
+        status: Optional[str] = None,
+        limit: int = 10,
+        offset: int = 0,
+        similarity_threshold: Optional[float] = None,
+    ) -> dict[str, Any]:
         """
-        Search submissions using natural language query.
+        Universal search across all hackathons and entities.
 
-        Converts the query to an embedding and performs vector similarity
-        search against submission embeddings in ZeroDB.
-
-        Args:
-            query: Natural language search query (e.g., "AI-powered healthcare")
-            hackathon_id: Hackathon to search within
-            top_k: Number of results to return (default: 10, max: 50)
-            filters: Additional metadata filters (track_id, status, etc.)
-            min_similarity: Minimum similarity threshold 0.0-1.0 (default: 0.5)
-
-        Returns:
-            List of SearchResult objects sorted by similarity (highest first)
-
-        Raises:
-            ValueError: If query is empty or top_k is invalid
-            ZeroDBError: If embedding generation or search fails
-
-        Example:
-            >>> results = await service.search_by_query(
-            ...     query="machine learning projects",
-            ...     hackathon_id="hack-123",
-            ...     top_k=5,
-            ...     filters={"track_id": "ai-ml", "status": "SUBMITTED"}
-            ... )
-        """
-        # Validate inputs
-        if not query or not query.strip():
-            raise ValueError("Search query cannot be empty")
-
-        if top_k < 1 or top_k > 50:
-            raise ValueError("top_k must be between 1 and 50")
-
-        if min_similarity < 0.0 or min_similarity > 1.0:
-            raise ValueError("min_similarity must be between 0.0 and 1.0")
-
-        logger.info(
-            f"Searching submissions with query='{query}', "
-            f"hackathon_id={hackathon_id}, top_k={top_k}"
-        )
-
-        try:
-            # Generate query embedding
-            query_embedding = await self._generate_query_embedding(query)
-
-            # Build namespace for this hackathon
-            namespace = f"hackathons/{hackathon_id}/submissions"
-
-            # Merge hackathon_id into filters
-            search_filters = filters.copy() if filters else {}
-            search_filters["hackathon_id"] = hackathon_id
-
-            # Search vectors in ZeroDB
-            results = await self.client.vectors.search(
-                query_vector=query_embedding,
-                top_k=top_k,
-                namespace=namespace,
-                filter=search_filters,
-                similarity_threshold=min_similarity
-            )
-
-            # Convert to SearchResult objects
-            search_results = self._convert_to_search_results(results)
-
-            logger.info(f"Found {len(search_results)} matching submissions")
-            return search_results
-
-        except ZeroDBTimeoutError as e:
-            logger.error(f"Timeout during search: {e}")
-            raise ZeroDBError(f"Search request timed out: {e}")
-        except ZeroDBError as e:
-            logger.error(f"ZeroDB error during search: {e}")
-            raise
-        except Exception as e:
-            logger.error(f"Unexpected error during search: {e}")
-            raise ZeroDBError(f"Search failed: {e}")
-
-    async def find_similar_submissions(
-        self,
-        submission_id: str,
-        hackathon_id: str,
-        top_k: int = 10,
-        filters: Optional[Dict[str, Any]] = None
-    ) -> List[SearchResult]:
-        """
-        Find submissions similar to a given submission.
-
-        Retrieves the embedding for the reference submission and searches
-        for similar submissions using vector similarity.
-
-        Args:
-            submission_id: Reference submission ID
-            hackathon_id: Hackathon context
-            top_k: Number of similar submissions to return (default: 10)
-            filters: Additional metadata filters (track_id, status, etc.)
-
-        Returns:
-            List of similar SearchResult objects (excludes reference submission)
-
-        Raises:
-            ValueError: If submission_id is empty or top_k is invalid
-            ZeroDBNotFound: If reference submission not found
-            ZeroDBError: If search fails
-
-        Example:
-            >>> results = await service.find_similar_submissions(
-            ...     submission_id="sub-123",
-            ...     hackathon_id="hack-456",
-            ...     top_k=10
-            ... )
-        """
-        # Validate inputs
-        if not submission_id or not submission_id.strip():
-            raise ValueError("submission_id cannot be empty")
-
-        if top_k < 1 or top_k > 50:
-            raise ValueError("top_k must be between 1 and 50")
-
-        logger.info(
-            f"Finding similar submissions for submission_id={submission_id}, "
-            f"hackathon_id={hackathon_id}, top_k={top_k}"
-        )
-
-        try:
-            # Build namespace
-            namespace = f"hackathons/{hackathon_id}/submissions"
-
-            # Get the submission's embedding from ZeroDB
-            vector_data = await self.client.vectors.get(
-                vector_id=submission_id,
-                namespace=namespace
-            )
-
-            if not vector_data or "embedding" not in vector_data:
-                raise ZeroDBNotFound(
-                    f"Embedding not found for submission {submission_id}"
-                )
-
-            # Build filters
-            search_filters = filters.copy() if filters else {}
-            search_filters["hackathon_id"] = hackathon_id
-
-            # Search for similar vectors (request top_k + 1 to account for self)
-            results = await self.client.vectors.search(
-                query_vector=vector_data["embedding"],
-                top_k=top_k + 1,
-                namespace=namespace,
-                filter=search_filters
-            )
-
-            # Remove the source submission from results
-            filtered_results = [
-                r for r in results
-                if r.get("vector_id") != submission_id or
-                r.get("metadata", {}).get("submission_id") != submission_id
-            ][:top_k]
-
-            # Convert to SearchResult objects
-            search_results = self._convert_to_search_results(filtered_results)
-
-            logger.info(f"Found {len(search_results)} similar submissions")
-            return search_results
-
-        except ZeroDBNotFound:
-            raise
-        except ZeroDBTimeoutError as e:
-            logger.error(f"Timeout finding similar submissions: {e}")
-            raise ZeroDBError(f"Search request timed out: {e}")
-        except ZeroDBError as e:
-            logger.error(f"ZeroDB error finding similar submissions: {e}")
-            raise
-        except Exception as e:
-            logger.error(f"Unexpected error finding similar submissions: {e}")
-            raise ZeroDBError(f"Search failed: {e}")
-
-    async def search_with_pagination(
-        self,
-        query: str,
-        hackathon_id: str,
-        page: int = 1,
-        page_size: int = 10,
-        filters: Optional[Dict[str, Any]] = None,
-        min_similarity: float = 0.5
-    ) -> Dict[str, Any]:
-        """
-        Search submissions with pagination support.
+        Searches across submissions, projects, teams, and hackathons using
+        semantic similarity.
 
         Args:
             query: Natural language search query
-            hackathon_id: Hackathon to search within
-            page: Page number (1-indexed, default: 1)
-            page_size: Results per page (default: 10, max: 50)
-            filters: Additional metadata filters
-            min_similarity: Minimum similarity threshold
+            entity_type: Filter by entity type (submission, project, team, hackathon)
+            status: Filter by status (e.g., SUBMITTED, DRAFT, LIVE)
+            limit: Maximum results (1-100)
+            offset: Pagination offset
+            similarity_threshold: Minimum similarity score (0.0-1.0)
 
         Returns:
             Dict containing:
-                - results: List of SearchResult objects for current page
-                - page: Current page number
-                - page_size: Results per page
-                - total: Total number of results
+            - results: List of search results with scores and metadata
+            - total_results: Total count of matches
+            - execution_time_ms: Search execution time
 
         Raises:
-            ValueError: If page or page_size is invalid
-            ZeroDBError: If search fails
+            HTTPException: 500 if search fails
+            HTTPException: 504 if search times out
         """
-        # Validate pagination parameters
-        if page < 1:
-            raise ValueError("page must be >= 1")
+        start_time = time.time()
 
-        if page_size < 1 or page_size > 50:
-            raise ValueError("page_size must be between 1 and 50")
-
-        # Calculate offset
-        offset = (page - 1) * page_size
-
-        # For vector search, we need to fetch all results up to the end of
-        # the requested page, then slice. This is a limitation of vector search.
-        # We'll fetch up to offset + page_size results.
-        fetch_limit = min(offset + page_size, 50)
-
-        # Perform search
-        all_results = await self.search_by_query(
-            query=query,
-            hackathon_id=hackathon_id,
-            top_k=fetch_limit,
-            filters=filters,
-            min_similarity=min_similarity
-        )
-
-        # Slice for pagination
-        paginated_results = all_results[offset:offset + page_size]
-
-        return {
-            "results": paginated_results,
-            "page": page,
-            "page_size": page_size,
-            "total": len(all_results),
-            "has_more": len(all_results) > offset + page_size
-        }
-
-    async def _generate_query_embedding(self, query: str) -> List[float]:
-        """
-        Generate embedding for search query.
-
-        Args:
-            query: Text query to embed
-
-        Returns:
-            List of floats representing the embedding vector
-
-        Raises:
-            ZeroDBError: If embedding generation fails
-        """
         try:
-            response = await self.client.embeddings.generate(
-                text=query,
-                model=self.model
+            # Build metadata filter
+            metadata_filter = {}
+            if entity_type:
+                metadata_filter["entity_type"] = entity_type
+            if status:
+                metadata_filter["status"] = status
+
+            # Search across all namespaces (use global namespace)
+            namespace = "global"
+
+            # Perform semantic search
+            search_results = await self.zerodb.embeddings.search(
+                query=query,
+                namespace=namespace,
+                top_k=limit + offset,  # Get extra for pagination
+                filter=metadata_filter if metadata_filter else None,
+                similarity_threshold=similarity_threshold,
+                include_metadata=True,
             )
 
-            if "embedding" not in response:
-                raise ZeroDBError(
-                    "Invalid response from embedding service: missing 'embedding' field"
+            # Apply pagination
+            paginated_results = search_results[offset : offset + limit]
+
+            # Transform results to match API schema
+            transformed_results = []
+            for result in paginated_results:
+                transformed_results.append(
+                    {
+                        "id": result.get("id"),
+                        "score": result.get("score", 0.0),
+                        "metadata": result.get("metadata", {}),
+                    }
                 )
 
-            embedding = response["embedding"]
-            logger.debug(
-                f"Generated embedding for query (dimensions: {len(embedding)})"
+            execution_time = (time.time() - start_time) * 1000  # Convert to ms
+
+            logger.info(
+                f"Universal search completed: query='{query}', "
+                f"results={len(transformed_results)}, "
+                f"execution_time={execution_time:.2f}ms"
             )
-            return embedding
 
-        except ZeroDBError:
-            raise
-        except Exception as e:
-            logger.error(f"Failed to generate embedding: {e}")
-            raise ZeroDBError(f"Embedding generation failed: {e}")
+            return {
+                "results": transformed_results,
+                "total_results": len(search_results),
+                "execution_time_ms": round(execution_time, 2),
+            }
 
-    def _convert_to_search_results(
+        except ZeroDBTimeoutError as e:
+            logger.error(f"Search timeout: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+                detail="Search request timed out. Please try again.",
+            )
+        except ZeroDBError as e:
+            logger.error(f"Search failed: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to execute search. Please try again.",
+            )
+
+    async def search_hackathon(
         self,
-        results: List[Dict[str, Any]]
-    ) -> List[SearchResult]:
+        hackathon_id: str,
+        query: str,
+        entity_type: Optional[str] = None,
+        track_id: Optional[str] = None,
+        status: Optional[str] = None,
+        limit: int = 10,
+        offset: int = 0,
+        similarity_threshold: Optional[float] = 0.5,
+    ) -> dict[str, Any]:
         """
-        Convert ZeroDB vector search results to SearchResult objects.
+        Search within a specific hackathon.
+
+        Performs semantic search scoped to a hackathon, with optional filtering
+        by track, entity type, and status.
 
         Args:
-            results: Raw results from ZeroDB vector search
+            hackathon_id: Hackathon UUID to search within
+            query: Natural language search query
+            entity_type: Filter by entity type (submission, project, team)
+            track_id: Filter by track ID
+            status: Filter by status (e.g., SUBMITTED, DRAFT)
+            limit: Maximum results (1-100)
+            offset: Pagination offset
+            similarity_threshold: Minimum similarity score (0.0-1.0)
 
         Returns:
-            List of SearchResult objects
+            Dict containing:
+            - results: List of search results with scores and metadata
+            - total_results: Total count of matches
+            - execution_time_ms: Search execution time
+            - hackathon_id: The hackathon scope
+
+        Raises:
+            HTTPException: 404 if hackathon not found
+            HTTPException: 500 if search fails
+            HTTPException: 504 if search times out
+
+        Performance:
+            Target: < 200ms execution time
         """
-        search_results = []
+        start_time = time.time()
 
-        for result in results:
-            metadata = result.get("metadata", {})
-
-            # Extract fields with fallbacks
-            submission_id = (
-                metadata.get("submission_id") or
-                result.get("vector_id") or
-                result.get("id") or
-                ""
+        try:
+            # Verify hackathon exists
+            hackathon_rows = await self.zerodb.tables.query_rows(
+                "hackathons",
+                filter={"hackathon_id": hackathon_id},
+                limit=1,
             )
 
-            hackathon_id = metadata.get("hackathon_id", "")
-            title = metadata.get("project_name") or metadata.get("title", "")
-            description = metadata.get("description", "")
+            if not hackathon_rows:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Hackathon {hackathon_id} not found",
+                )
 
-            # Get similarity score
-            similarity = result.get("similarity") or result.get("score", 0.0)
+            # Build metadata filter
+            metadata_filter = {"hackathon_id": hackathon_id}
+            if entity_type:
+                metadata_filter["entity_type"] = entity_type
+            if track_id:
+                metadata_filter["track_id"] = track_id
+            if status:
+                metadata_filter["status"] = status
 
-            # Create SearchResult
-            search_results.append(SearchResult(
-                submission_id=submission_id,
-                hackathon_id=hackathon_id,
-                title=title,
-                description=description,
-                similarity_score=similarity,
-                metadata=metadata
-            ))
+            # Use hackathon-scoped namespace
+            namespace = f"hackathons/{hackathon_id}"
 
-        return search_results
+            # Perform semantic search
+            search_results = await self.zerodb.embeddings.search(
+                query=query,
+                namespace=namespace,
+                top_k=limit + offset,  # Get extra for pagination
+                filter=metadata_filter,
+                similarity_threshold=similarity_threshold,
+                include_metadata=True,
+            )
 
+            # Apply pagination
+            paginated_results = search_results[offset : offset + limit]
 
-# Convenience function for quick searches
-async def quick_search(
-    zerodb_client: ZeroDBClient,
-    query: str,
-    hackathon_id: str,
-    top_k: int = 10
-) -> List[Dict[str, Any]]:
-    """
-    Quick search function for simple use cases.
+            # Transform results to match API schema
+            transformed_results = []
+            for result in paginated_results:
+                transformed_results.append(
+                    {
+                        "id": result.get("id"),
+                        "score": result.get("score", 0.0),
+                        "metadata": result.get("metadata", {}),
+                    }
+                )
 
-    Args:
-        zerodb_client: ZeroDB client instance
-        query: Natural language search query
-        hackathon_id: Hackathon to search within
-        top_k: Number of results to return
+            execution_time = (time.time() - start_time) * 1000  # Convert to ms
 
-    Returns:
-        List of search result dictionaries
+            # Log performance warning if > 200ms
+            if execution_time > 200:
+                logger.warning(
+                    f"Search exceeded target time: "
+                    f"hackathon={hackathon_id}, "
+                    f"execution_time={execution_time:.2f}ms"
+                )
+            else:
+                logger.info(
+                    f"Hackathon search completed: "
+                    f"hackathon={hackathon_id}, "
+                    f"query='{query}', "
+                    f"results={len(transformed_results)}, "
+                    f"execution_time={execution_time:.2f}ms"
+                )
 
-    Example:
-        >>> results = await quick_search(
-        ...     zerodb_client=client,
-        ...     query="blockchain projects",
-        ...     hackathon_id="hack-123"
-        ... )
-    """
-    service = SearchService(zerodb_client)
-    results = await service.search_by_query(
-        query=query,
-        hackathon_id=hackathon_id,
-        top_k=top_k
-    )
-    return [r.to_dict() for r in results]
+            return {
+                "results": transformed_results,
+                "total_results": len(search_results),
+                "execution_time_ms": round(execution_time, 2),
+                "hackathon_id": hackathon_id,
+            }
+
+        except HTTPException:
+            raise
+        except ZeroDBTimeoutError as e:
+            logger.error(f"Search timeout: hackathon={hackathon_id}, error={e}")
+            raise HTTPException(
+                status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+                detail="Search request timed out. Please try again.",
+            )
+        except ZeroDBError as e:
+            logger.error(f"Search failed: hackathon={hackathon_id}, error={e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to execute search. Please try again.",
+            )

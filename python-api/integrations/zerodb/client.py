@@ -87,7 +87,9 @@ class ZeroDBClient:
         # Initialize API wrappers (lazy loading)
         self._tables = None
         self._vectors = None
+        self._embeddings = None
         self._events = None
+        self._embeddings = None
 
     @property
     def tables(self):
@@ -108,6 +110,15 @@ class ZeroDBClient:
         return self._vectors
 
     @property
+    def embeddings(self):
+        """Access Embeddings API operations"""
+        if self._embeddings is None:
+            from .embeddings import EmbeddingsAPI
+
+            self._embeddings = EmbeddingsAPI(self)
+        return self._embeddings
+
+    @property
     def events(self):
         """Access Events API operations"""
         if self._events is None:
@@ -115,6 +126,15 @@ class ZeroDBClient:
 
             self._events = EventsAPI(self)
         return self._events
+
+    @property
+    def embeddings(self):
+        """Access Embeddings API operations"""
+        if self._embeddings is None:
+            from .embeddings import EmbeddingsAPI
+
+            self._embeddings = EmbeddingsAPI(self)
+        return self._embeddings
 
     @retry(
         stop=stop_after_attempt(3),
