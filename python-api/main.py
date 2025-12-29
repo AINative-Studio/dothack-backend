@@ -14,7 +14,7 @@ import sys
 from datetime import datetime
 from typing import Any
 
-from api.routes import participants, search
+from api.routes import analytics, participants, search
 from config import settings
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
@@ -77,6 +77,8 @@ logger.info(f"CORS configured with allowed origins: {settings.ALLOWED_ORIGINS}")
 
 # Register API Routes
 app.include_router(participants.router)
+app.include_router(analytics.router)
+logger.info("Registered analytics and export routes")
 app.include_router(search.router)
 logger.info("Registered participant management routes")
 logger.info("Registered search routes")
