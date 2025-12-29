@@ -89,7 +89,8 @@ class ZeroDBClient:
         self._vectors = None
         self._embeddings = None
         self._events = None
-        self._embeddings = None
+        self._rlhf = None
+        self._memory = None
 
     @property
     def tables(self):
@@ -135,6 +136,24 @@ class ZeroDBClient:
 
             self._embeddings = EmbeddingsAPI(self)
         return self._embeddings
+
+    @property
+    def rlhf(self):
+        """Access RLHF API operations"""
+        if self._rlhf is None:
+            from .rlhf import RLHFAPI
+
+            self._rlhf = RLHFAPI(self)
+        return self._rlhf
+
+    @property
+    def memory(self):
+        """Access Memory API operations"""
+        if self._memory is None:
+            from .memory import MemoryAPI
+
+            self._memory = MemoryAPI(self)
+        return self._memory
 
     @retry(
         stop=stop_after_attempt(3),
