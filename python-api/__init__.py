@@ -1,0 +1,1 @@
+"""DotHack Backend API package."""

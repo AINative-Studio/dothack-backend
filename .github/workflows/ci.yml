@@ -1,0 +1,229 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  PYTHON_VERSION: '3.11'
+  GO_VERSION: '1.21'
+
+jobs:
+  # Python linting and type checking
+  python-lint:
+    name: Python Linting
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install black ruff mypy
+          if [ -f python-api/requirements.txt ]; then
+            pip install -r python-api/requirements.txt
+          fi
+          if [ -f python-api/requirements-dev.txt ]; then
+            pip install -r python-api/requirements-dev.txt
+          fi
+
+      - name: Run Black (code formatting check)
+        run: |
+          black --check --diff python-api/
+        continue-on-error: false
+
+      - name: Run Ruff (fast linting)
+        run: |
+          ruff check python-api/ --output-format=github
+        continue-on-error: false
+
+      - name: Run mypy (type checking)
+        run: |
+          mypy python-api/ --ignore-missing-imports --no-strict-optional
+        continue-on-error: true  # Allow to fail initially as type hints are added gradually
+
+  # Python testing with coverage
+  python-test:
+    name: Python Tests & Coverage
+    runs-on: ubuntu-latest
+    needs: python-lint
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-cov pytest-asyncio httpx
+          if [ -f python-api/requirements.txt ]; then
+            pip install -r python-api/requirements.txt
+          fi
+          if [ -f python-api/requirements-dev.txt ]; then
+            pip install -r python-api/requirements-dev.txt
+          fi
+
+      - name: Create test environment variables
+        run: |
+          cat > .env.test << EOF
+          ZERODB_API_KEY=test_api_key
+          ZERODB_PROJECT_ID=test_project_id
+          ZERODB_BASE_URL=https://api.ainative.studio
+          AINATIVE_API_KEY=test_ainative_key
+          AINATIVE_BASE_URL=https://api.ainative.studio
+          EOF
+
+      - name: Run pytest with coverage
+        run: |
+          cd python-api
+          pytest tests/ -v --cov=. --cov-report=term-missing --cov-report=xml --cov-fail-under=80
+        env:
+          PYTHONPATH: ${{ github.workspace }}/python-api
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./python-api/coverage.xml
+          flags: python
+          name: python-coverage
+          fail_ci_if_error: false
+
+      - name: Generate coverage badge
+        if: github.ref == 'refs/heads/main'
+        run: |
+          echo "Coverage report generated"
+
+  # Go linting and testing
+  go-lint-test:
+    name: Go Linting & Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: go-services/go.sum
+
+      - name: Install dependencies
+        working-directory: ./go-services
+        run: |
+          go mod download
+          go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+
+      - name: Run golangci-lint
+        working-directory: ./go-services
+        run: |
+          golangci-lint run ./... --timeout 5m
+        continue-on-error: true  # Allow to fail initially
+
+      - name: Run Go tests
+        working-directory: ./go-services
+        run: |
+          go test ./... -v -race -coverprofile=coverage.out -covermode=atomic
+
+      - name: Upload Go coverage
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./go-services/coverage.out
+          flags: go
+          name: go-coverage
+          fail_ci_if_error: false
+
+  # Security scanning
+  security-scan:
+    name: Security Scanning
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  # Docker build test (no push)
+  docker-build:
+    name: Docker Build Test
+    runs-on: ubuntu-latest
+    needs: [python-test, go-lint-test]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Python API image (test only)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./python-api/Dockerfile
+          push: false
+          tags: dothack-python:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+        continue-on-error: true  # Allow to fail until Dockerfile is created
+
+      - name: Build Go Services image (test only)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./go-services/Dockerfile
+          push: false
+          tags: dothack-go:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+        continue-on-error: true  # Allow to fail until Dockerfile is created
+
+  # All checks passed - ready for merge
+  ci-success:
+    name: CI Pipeline Success
+    runs-on: ubuntu-latest
+    needs: [python-lint, python-test, go-lint-test, security-scan]
+    if: always()
+
+    steps:
+      - name: Check all jobs
+        run: |
+          echo "All CI jobs completed"
+          if [ "${{ needs.python-lint.result }}" != "success" ]; then
+            echo "Python linting failed"
+            exit 1
+          fi
+          if [ "${{ needs.python-test.result }}" != "success" ]; then
+            echo "Python tests failed"
+            exit 1
+          fi
+          # Go tests are optional for now
+          echo "CI Pipeline successful!"
