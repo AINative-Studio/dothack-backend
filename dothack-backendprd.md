@@ -713,22 +713,101 @@ POST /v1/public/{project_id}/database/files
 - Events: 10,000,000/month
 - Quantum features enabled
 
-### 7.3 Security
+### 7.3 Security & Authentication
 
-1. **Authentication**
-   - API Key stored in environment variables
-   - Project-scoped data isolation (automatic in ZeroDB)
-   - No cross-project data leakage
+**🚨 MANDATORY: Use AINative Studio Authentication System**
 
-2. **Authorization**
-   - Role-based access (ORGANIZER, BUILDER, JUDGE, MENTOR)
-   - Participant → Hackathon mapping validation
-   - Judge can only score assigned tracks
+DotHack Backend **MUST NOT** build standalone authentication. Instead, it **MUST** integrate with the existing AINative Studio authentication platform.
 
-3. **Data Validation**
-   - Pydantic models for request validation
-   - SQL injection prevention (ZeroDB handles)
-   - Rate limiting: Pro tier (10,000 requests/hour)
+**Rationale:**
+- ✅ Centralized user management across all AINative products
+- ✅ Single Sign-On (SSO) capability for users
+- ✅ OAuth integration (GitHub, LinkedIn) pre-built
+- ✅ Production-grade security (bcrypt, JWT, token blacklisting)
+- ✅ API key management for programmatic access
+- ✅ Zero maintenance cost for auth infrastructure
+
+#### Authentication Architecture
+
+```
+┌─────────────────────────────────────────┐
+│       DotHack Frontend (Web/Mobile)      │
+└─────────────────┬───────────────────────┘
+                  │
+        ┌─────────┴──────────┐
+        │                    │
+   ┌────▼─────┐        ┌────▼─────┐
+   │ DotHack  │        │ AINative │
+   │  Python  │◄──────►│   Auth   │
+   │  FastAPI │        │   API    │
+   │  (8000)  │        │          │
+   └────┬─────┘        └──────────┘
+        │              /v1/auth/*
+        │
+   ┌────▼─────┐
+   │  ZeroDB  │
+   └──────────┘
+```
+
+#### AINative Auth Endpoints
+
+**Base URL:** `https://api.ainative.studio`
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/v1/auth/register` | POST | User registration |
+| `/v1/auth/login` | POST | Email/password login |
+| `/v1/auth/logout` | POST | Token blacklisting |
+| `/v1/auth/refresh` | POST | Refresh access token |
+| `/v1/auth/me` | GET | Get current user (token verification) |
+| `/v1/auth/github/callback` | POST | GitHub OAuth |
+| `/v1/auth/linkedin/callback` | POST | LinkedIn OAuth |
+
+#### Authentication Methods
+
+| Method | Header | Format | Use Case |
+|--------|--------|--------|----------|
+| **JWT Token** | `Authorization` | `Bearer {token}` | Web/mobile apps |
+| **API Key** | `X-API-Key` | `{api_key}` | Server-to-server |
+
+#### Role-Based Access Control (RBAC)
+
+**Roles stored in ZeroDB `hackathon_participants` table:**
+
+```json
+{
+  "id": "uuid",
+  "hackathon_id": "uuid",
+  "participant_id": "uuid",  // AINative user_id
+  "role": "ORGANIZER | BUILDER | JUDGE | MENTOR",
+  "metadata": {
+    "ainative_user_email": "user@example.com",
+    "ainative_user_name": "John Doe"
+  },
+  "joined_at": "timestamp"
+}
+```
+
+#### Implementation Requirements
+
+**✅ REQUIRED:**
+1. Verify all tokens via AINative `/v1/auth/me`
+2. Store AINative `user_id` in `hackathon_participants`
+3. Implement role checking for protected endpoints
+4. Use API keys for server-to-server calls
+
+**❌ FORBIDDEN:**
+1. Building custom `/auth/register`, `/auth/login` endpoints
+2. Storing passwords in DotHack database
+3. Custom JWT token generation
+4. Custom OAuth implementation
+
+#### Data Validation
+- Pydantic models for request validation
+- SQL injection prevention (ZeroDB handles)
+- Rate limiting: Pro tier (10,000 requests/hour)
+
+**See `/docs/AUTHENTICATION_ARCHITECTURE.md` for complete implementation guide.**
 
 ### 7.4 Monitoring
 
