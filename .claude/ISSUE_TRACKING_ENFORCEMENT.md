@@ -246,6 +246,136 @@ Before an AI agent writes ANY code, it MUST:
 [ ] 5. Add final summary comment if manual close needed
 ```
 
+### **🚨 MANDATORY GIT WORKFLOW - NEVER SKIP THESE STEPS:**
+
+**This workflow MUST be followed for EVERY feature, bug fix, or change:**
+
+```bash
+# Step 1: Commit files to feature branch
+git checkout -b [type]/[issue-number]-[description]
+git add [specific files for this issue only]
+git commit -m "Description
+
+Details
+
+Closes #[issue-number]"
+
+# Step 2: Push feature branch to GitHub
+git push origin [type]/[issue-number]-[description]
+
+# Step 3: Create Pull Request
+gh pr create --title "[TYPE] Description - Fixes #[issue-number]" \
+  --body "Closes #[issue-number]
+
+## Summary
+[Changes made]
+
+## Test Plan
+[How to test]
+
+## Risk/Rollback
+[Potential risks and rollback steps]"
+
+# Step 4: Check for conflicts with main
+gh pr view [PR-number] --json mergeable
+
+# Step 5: Merge to main (only if no conflicts)
+gh pr merge [PR-number] --squash --delete-branch
+
+# Step 6: Verify issue closed
+gh issue view [issue-number] --json state
+```
+
+**⚠️ CRITICAL RULES:**
+
+1. **NEVER run `git clean -fd` on untracked code**
+   - Untracked files = LOST FOREVER
+   - Always commit to branches BEFORE cleaning
+   - Use `git status` to verify all work is committed
+
+2. **NEVER commit multiple issues to one branch**
+   - Each issue = separate feature branch
+   - Each branch = one PR
+   - One PR = one issue closed
+
+3. **NEVER push directly to main**
+   - ALL changes go through PR workflow
+   - Even trivial fixes need PRs
+   - Main branch is protected
+
+4. **NEVER skip the PR step**
+   - PRs provide review trail
+   - PRs trigger CI/CD
+   - PRs create audit history
+
+5. **NEVER delete branches before merging**
+   - Feature branches live until merged
+   - Delete only AFTER successful merge
+   - GitHub can auto-delete on merge
+
+**🛑 VIOLATION CONSEQUENCES:**
+
+If you skip these steps:
+- ❌ Lost code (if using `git clean -fd` on untracked files)
+- ❌ No audit trail
+- ❌ Cannot track what changed
+- ❌ Cannot rollback easily
+- ❌ Team cannot review changes
+- ❌ CI/CD doesn't run
+- ❌ Breaking team workflow
+
+**Example of CORRECT workflow:**
+
+```bash
+# Issue #42: Add user profile endpoint
+
+# 1. Create branch
+git checkout -b feature/42-user-profile-endpoint
+
+# 2. Write code, then commit
+git add api/routes/profile.py tests/test_profile.py
+git commit -m "Add user profile endpoint
+
+- GET /v1/users/me endpoint
+- Profile schema with validation
+- Tests with 85% coverage
+
+Closes #42"
+
+# 3. Push branch
+git push origin feature/42-user-profile-endpoint
+
+# 4. Create PR
+gh pr create --title "[FEATURE] Add user profile endpoint - Fixes #42" \
+  --body "Closes #42
+
+## Summary
+- New GET /v1/users/me endpoint
+- Returns authenticated user profile
+- Includes tests
+
+## Test Plan
+- Run pytest tests/test_profile.py
+- Manual test with curl
+
+## Risk/Rollback
+- Low risk - new endpoint only
+- Rollback: Remove route registration from main.py"
+
+# 5. Check for conflicts
+gh pr view 50 --json mergeable
+# Output: {"mergeable": "MERGEABLE"}
+
+# 6. Merge and delete branch
+gh pr merge 50 --squash --delete-branch
+
+# 7. Verify issue closed
+gh issue view 42 --json state
+# Output: {"state": "CLOSED"}
+```
+
+**This workflow is MANDATORY and ZERO TOLERANCE. Failure to follow it costs money, time, and data.**
+
 ---
 
 ## 5) Integration with Semantic Seed Standards
