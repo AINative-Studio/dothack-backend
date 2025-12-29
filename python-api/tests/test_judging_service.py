@@ -704,3 +704,258 @@ class TestEdgeCases:
 
             # Assert
             assert result == []
+
+
+class TestErrorHandling:
+    """Test error handling scenarios"""
+
+    @pytest.mark.asyncio
+    async def test_submit_score_timeout_error(self):
+        """Should handle timeout errors during score submission"""
+        # Arrange
+        mock_client = AsyncMock()
+        submission_id = str(uuid.uuid4())
+        judge_id = str(uuid.uuid4())
+
+        # Mock authorization and duplicate check
+        mock_client.tables.query_rows.side_effect = [
+            [{"user_id": judge_id, "hackathon_id": "hack-123", "role": "judge"}],
+            [],  # No existing scores
+        ]
+
+        # Mock timeout during insertion
+        mock_client.tables.insert_rows.side_effect = ZeroDBTimeoutError("Request timed out")
+
+        # Act & Assert
+        with pytest.raises(HTTPException) as exc_info:
+            await submit_score(
+                zerodb_client=mock_client,
+                submission_id=submission_id,
+                judge_participant_id=judge_id,
+                hackathon_id="hack-123",
+                rubric_id=str(uuid.uuid4()),
+                scores_breakdown={"innovation": 8},
+                total_score=8.0,
+            )
+
+        assert exc_info.value.status_code == 504
+
+    @pytest.mark.asyncio
+    async def test_get_scores_timeout_error(self):
+        """Should handle timeout errors when retrieving scores"""
+        # Arrange
+        mock_client = AsyncMock()
+        submission_id = str(uuid.uuid4())
+
+        mock_client.tables.query_rows.side_effect = ZeroDBTimeoutError("Request timed out")
+
+        # Act & Assert
+        with pytest.raises(HTTPException) as exc_info:
+            await get_scores(
+                zerodb_client=mock_client,
+                submission_id=submission_id,
+            )
+
+        assert exc_info.value.status_code == 504
+
+    @pytest.mark.asyncio
+    async def test_get_scores_database_error(self):
+        """Should handle database errors when retrieving scores"""
+        # Arrange
+        mock_client = AsyncMock()
+        submission_id = str(uuid.uuid4())
+
+        mock_client.tables.query_rows.side_effect = ZeroDBError("Database error", status_code=500)
+
+        # Act & Assert
+        with pytest.raises(HTTPException) as exc_info:
+            await get_scores(
+                zerodb_client=mock_client,
+                submission_id=submission_id,
+            )
+
+        assert exc_info.value.status_code == 500
+
+    @pytest.mark.asyncio
+    async def test_get_scores_unexpected_error(self):
+        """Should handle unexpected errors when retrieving scores"""
+        # Arrange
+        mock_client = AsyncMock()
+        submission_id = str(uuid.uuid4())
+
+        mock_client.tables.query_rows.side_effect = RuntimeError("Unexpected error")
+
+        # Act & Assert
+        with pytest.raises(HTTPException) as exc_info:
+            await get_scores(
+                zerodb_client=mock_client,
+                submission_id=submission_id,
+            )
+
+        assert exc_info.value.status_code == 500
+
+    @pytest.mark.asyncio
+    async def test_calculate_rankings_timeout_error(self):
+        """Should handle timeout errors during rankings calculation"""
+        # Arrange
+        mock_client = AsyncMock()
+        hackathon_id = "hack-123"
+
+        mock_client.tables.query_rows.side_effect = ZeroDBTimeoutError("Request timed out")
+
+        # Act & Assert
+        with pytest.raises(HTTPException) as exc_info:
+            await calculate_rankings(
+                zerodb_client=mock_client,
+                hackathon_id=hackathon_id,
+            )
+
+        assert exc_info.value.status_code == 504
+
+    @pytest.mark.asyncio
+    async def test_calculate_rankings_database_error(self):
+        """Should handle database errors during rankings calculation"""
+        # Arrange
+        mock_client = AsyncMock()
+        hackathon_id = "hack-123"
+
+        mock_client.tables.query_rows.side_effect = ZeroDBError("Database error", status_code=500)
+
+        # Act & Assert
+        with pytest.raises(HTTPException) as exc_info:
+            await calculate_rankings(
+                zerodb_client=mock_client,
+                hackathon_id=hackathon_id,
+            )
+
+        assert exc_info.value.status_code == 500
+
+    @pytest.mark.asyncio
+    async def test_calculate_rankings_unexpected_error(self):
+        """Should handle unexpected errors during rankings calculation"""
+        # Arrange
+        mock_client = AsyncMock()
+        hackathon_id = "hack-123"
+
+        mock_client.tables.query_rows.side_effect = RuntimeError("Unexpected error")
+
+        # Act & Assert
+        with pytest.raises(HTTPException) as exc_info:
+            await calculate_rankings(
+                zerodb_client=mock_client,
+                hackathon_id=hackathon_id,
+            )
+
+        assert exc_info.value.status_code == 500
+
+    @pytest.mark.asyncio
+    async def test_get_leaderboard_timeout_error(self):
+        """Should handle timeout errors during leaderboard generation"""
+        # Arrange
+        mock_client = AsyncMock()
+        hackathon_id = "hack-123"
+
+        with patch("services.judging_service.calculate_rankings", side_effect=ZeroDBTimeoutError("Timeout")):
+            # Act & Assert
+            with pytest.raises(HTTPException) as exc_info:
+                await get_leaderboard(
+                    zerodb_client=mock_client,
+                    hackathon_id=hackathon_id,
+                )
+
+            assert exc_info.value.status_code == 504
+
+    @pytest.mark.asyncio
+    async def test_get_leaderboard_database_error(self):
+        """Should handle database errors during leaderboard generation"""
+        # Arrange
+        mock_client = AsyncMock()
+        hackathon_id = "hack-123"
+
+        with patch("services.judging_service.calculate_rankings", side_effect=ZeroDBError("DB error", status_code=500)):
+            # Act & Assert
+            with pytest.raises(HTTPException) as exc_info:
+                await get_leaderboard(
+                    zerodb_client=mock_client,
+                    hackathon_id=hackathon_id,
+                )
+
+            assert exc_info.value.status_code == 500
+
+    @pytest.mark.asyncio
+    async def test_get_leaderboard_unexpected_error(self):
+        """Should handle unexpected errors during leaderboard generation"""
+        # Arrange
+        mock_client = AsyncMock()
+        hackathon_id = "hack-123"
+
+        with patch("services.judging_service.calculate_rankings", side_effect=RuntimeError("Unexpected")):
+            # Act & Assert
+            with pytest.raises(HTTPException) as exc_info:
+                await get_leaderboard(
+                    zerodb_client=mock_client,
+                    hackathon_id=hackathon_id,
+                )
+
+            assert exc_info.value.status_code == 500
+
+    @pytest.mark.asyncio
+    async def test_submit_score_unexpected_error(self):
+        """Should handle unexpected errors during score submission"""
+        # Arrange
+        mock_client = AsyncMock()
+        submission_id = str(uuid.uuid4())
+        judge_id = str(uuid.uuid4())
+
+        # Mock authorization and duplicate check
+        mock_client.tables.query_rows.side_effect = [
+            [{"user_id": judge_id, "hackathon_id": "hack-123", "role": "judge"}],
+            [],  # No existing scores
+        ]
+
+        # Mock unexpected error during insertion
+        mock_client.tables.insert_rows.side_effect = RuntimeError("Unexpected error")
+
+        # Act & Assert
+        with pytest.raises(HTTPException) as exc_info:
+            await submit_score(
+                zerodb_client=mock_client,
+                submission_id=submission_id,
+                judge_participant_id=judge_id,
+                hackathon_id="hack-123",
+                rubric_id=str(uuid.uuid4()),
+                scores_breakdown={"innovation": 8},
+                total_score=8.0,
+            )
+
+        assert exc_info.value.status_code == 500
+
+    @pytest.mark.asyncio
+    async def test_get_leaderboard_skips_missing_projects(self):
+        """Should skip entries when project details cannot be found"""
+        # Arrange
+        mock_client = AsyncMock()
+        hackathon_id = "hack-123"
+
+        mock_rankings = [
+            {
+                "rank": 1,
+                "submission_id": "sub-1",
+                "project_id": "proj-1",
+                "average_score": 29.0,
+                "score_count": 3,
+            }
+        ]
+
+        with patch("services.judging_service.calculate_rankings", return_value=mock_rankings):
+            # Mock project not found
+            mock_client.tables.query_rows.return_value = []
+
+            # Act
+            result = await get_leaderboard(
+                zerodb_client=mock_client,
+                hackathon_id=hackathon_id,
+            )
+
+            # Assert - Should skip the entry
+            assert len(result) == 0
