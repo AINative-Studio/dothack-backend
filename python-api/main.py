@@ -14,7 +14,7 @@ import sys
 from datetime import datetime
 from typing import Any
 
-from api.routes import analytics, hackathons, judging, participants, search, submissions, teams
+from api.routes import analytics, participants, search
 from config import settings
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
@@ -54,83 +54,12 @@ logger = logging.getLogger(__name__)
 
 # Initialize FastAPI app
 app = FastAPI(
-    title="DotHack Hackathon Platform API",
-    description="""
-# DotHack Hackathon Platform Backend API
-
-A comprehensive REST API for managing hackathons, teams, submissions, and judging.
-
-## Features
-
-- **Hackathon Management**: Create and manage hackathons with full lifecycle support
-- **Team Collaboration**: Form teams, manage members, and track team progress
-- **Submission System**: Submit projects with file uploads and metadata
-- **Judging Platform**: Score submissions with rubric-based evaluation
-- **Participant Management**: Join hackathons, invite judges, and track participation
-
-## Authentication
-
-All endpoints require authentication via:
-- **JWT Bearer Token**: Include in Authorization header as `Bearer <token>`
-- **API Key**: Include in X-API-Key header
-
-## Rate Limiting
-
-API requests are rate-limited to ensure fair usage. Default limits:
-- 100 requests per minute per API key
-- 1000 requests per hour per API key
-
-## Support
-
-For questions or issues, contact: hello@ainative.studio
-    """,
+    title="DotHack Backend API",
+    description="Lead enrichment and outreach automation platform",
     version=settings.API_VERSION,
     docs_url=f"/{settings.API_VERSION}/docs",
     redoc_url=f"/{settings.API_VERSION}/redoc",
     openapi_url="/openapi.json",
-    contact={
-        "name": "AINative Studio Support",
-        "url": "https://ainative.studio",
-        "email": "hello@ainative.studio",
-    },
-    license_info={
-        "name": "MIT License",
-        "url": "https://opensource.org/licenses/MIT",
-    },
-    openapi_tags=[
-        {
-            "name": "Health",
-            "description": "System health check and status endpoints",
-        },
-        {
-            "name": "Hackathons",
-            "description": "Hackathon CRUD operations - Create, read, update, and delete hackathons. Manage lifecycle from draft to completion.",
-        },
-        {
-            "name": "Teams",
-            "description": "Team management - Form teams, add/remove members, and manage team details for hackathon participation.",
-        },
-        {
-            "name": "Submissions",
-            "description": "Project submission management - Submit projects, upload files, and track submission status.",
-        },
-        {
-            "name": "Judging",
-            "description": "Judging and scoring - Submit scores, view leaderboards, and manage judging assignments.",
-        },
-        {
-            "name": "Participants",
-            "description": "Participant operations - Join hackathons, invite judges, and manage participant roles (BUILDER, JUDGE, ORGANIZER, MENTOR).",
-        },
-        {
-            "name": "Analytics",
-            "description": "Analytics and data export - Get hackathon statistics and export data in JSON or CSV format (ORGANIZER only).",
-        },
-        {
-            "name": "Search",
-            "description": "Semantic search - Search submissions using natural language queries and find similar projects using AI-powered vector similarity.",
-        },
-    ],
 )
 
 
@@ -147,26 +76,12 @@ logger.info(f"CORS configured with allowed origins: {settings.ALLOWED_ORIGINS}")
 
 
 # Register API Routes
-app.include_router(hackathons.router)
-logger.info("Registered hackathon management routes")
-
-app.include_router(teams.router)
-logger.info("Registered team management routes")
-
-app.include_router(submissions.router)
-logger.info("Registered submission management routes")
-
-app.include_router(judging.router)
-logger.info("Registered judging and scoring routes")
-
 app.include_router(participants.router)
-logger.info("Registered participant management routes")
-
 app.include_router(analytics.router)
 logger.info("Registered analytics and export routes")
-
 app.include_router(search.router)
-logger.info("Registered semantic search routes")
+logger.info("Registered participant management routes")
+logger.info("Registered search routes")
 
 
 # Global Exception Handlers
