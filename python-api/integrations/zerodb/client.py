@@ -91,6 +91,7 @@ class ZeroDBClient:
         self._events = None
         self._rlhf = None
         self._memory = None
+        self._files = None
 
     @property
     def tables(self):
@@ -154,6 +155,15 @@ class ZeroDBClient:
 
             self._memory = MemoryAPI(self)
         return self._memory
+
+    @property
+    def files(self):
+        """Access Files API operations"""
+        if self._files is None:
+            from .files import FilesAPI
+
+            self._files = FilesAPI(self)
+        return self._files
 
     @retry(
         stop=stop_after_attempt(3),
