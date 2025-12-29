@@ -15,6 +15,8 @@ from api.schemas.submission import (
     FileMetadata,
     FileUploadRequest,
     FileUploadResponse,
+    SimilarSubmissionItem,
+    SimilarSubmissionsResponse,
     SubmissionCreateRequest,
     SubmissionListResponse,
     SubmissionResponse,
@@ -25,6 +27,7 @@ from integrations.zerodb.client import ZeroDBClient
 from services.submission_service import (
     create_submission,
     delete_submission,
+    find_similar_submissions,
     get_submission,
     list_submissions,
     update_submission,
@@ -548,4 +551,121 @@ async def upload_file_endpoint(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to upload file. Please contact support.",
+        )
+
+
+@router.get(
+    "/{submission_id}/similar",
+    response_model=SimilarSubmissionsResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Find similar submissions",
+    description="Find submissions similar to the given submission using semantic search",
+    responses={
+        200: {
+            "description": "Similar submissions found successfully",
+            "model": SimilarSubmissionsResponse,
+        },
+        404: {
+            "description": "Submission not found",
+            "model": ErrorResponse,
+        },
+        500: {
+            "description": "Internal server error",
+            "model": ErrorResponse,
+        },
+    },
+)
+async def get_similar_submissions(
+    submission_id: UUID,
+    top_k: int = Query(
+        10,
+        ge=1,
+        le=50,
+        description="Maximum number of similar submissions to return",
+    ),
+    similarity_threshold: float = Query(
+        0.5,
+        ge=0.0,
+        le=1.0,
+        description="Minimum similarity score (0.0-1.0)",
+    ),
+    same_hackathon_only: bool = Query(
+        True,
+        description="If true, only return submissions from the same hackathon",
+    ),
+    zerodb_client: ZeroDBClient = Depends(get_zerodb_client),
+) -> SimilarSubmissionsResponse:
+    """
+    Find submissions similar to the given submission.
+
+    Uses semantic search to find submissions with similar project descriptions
+    and content based on AI-powered vector similarity.
+
+    **Path Parameters:**
+    - submission_id: UUID of the submission to find similar submissions for
+
+    **Query Parameters:**
+    - top_k: Maximum number of results (1-50, default: 10)
+    - similarity_threshold: Minimum similarity score 0.0-1.0 (default: 0.5)
+    - same_hackathon_only: Only search within same hackathon (default: true)
+
+    **Returns:**
+    List of similar submissions sorted by relevance (highest similarity score first).
+    Each result includes:
+    - Full submission details
+    - Similarity score (0.0-1.0, higher is more similar)
+    - Execution time metrics
+
+    **Use Cases:**
+    - Discover related projects
+    - Find duplicate submissions
+    - Explore similar ideas within a hackathon
+    - Content recommendation
+
+    **Performance:**
+    Typical response time: < 300ms
+
+    **Note:**
+    - The query submission itself is excluded from results
+    - Results are ranked by similarity score (descending)
+    - Only returns submissions that meet the similarity threshold
+    """
+    try:
+        logger.info(
+            f"Finding similar submissions for {submission_id} "
+            f"(top_k={top_k}, threshold={similarity_threshold}, "
+            f"same_hackathon={same_hackathon_only})"
+        )
+
+        result = await find_similar_submissions(
+            zerodb_client=zerodb_client,
+            submission_id=str(submission_id),
+            top_k=top_k,
+            similarity_threshold=similarity_threshold,
+            same_hackathon_only=same_hackathon_only,
+        )
+
+        # Transform results to response schema
+        similar_items = [
+            SimilarSubmissionItem(**submission)
+            for submission in result["similar_submissions"]
+        ]
+
+        return SimilarSubmissionsResponse(
+            submission_id=result["submission_id"],
+            similar_submissions=similar_items,
+            total_found=result["total_found"],
+            execution_time_ms=result.get("execution_time_ms"),
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Unexpected error finding similar submissions: {str(e)}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to find similar submissions. Please contact support.",
         )
