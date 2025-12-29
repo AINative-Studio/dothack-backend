@@ -89,6 +89,7 @@ class ZeroDBClient:
         self._vectors = None
         self._embeddings = None
         self._events = None
+        self._embeddings = None
 
     @property
     def tables(self):
@@ -125,6 +126,15 @@ class ZeroDBClient:
 
             self._events = EventsAPI(self)
         return self._events
+
+    @property
+    def embeddings(self):
+        """Access Embeddings API operations"""
+        if self._embeddings is None:
+            from .embeddings import EmbeddingsAPI
+
+            self._embeddings = EmbeddingsAPI(self)
+        return self._embeddings
 
     @retry(
         stop=stop_after_attempt(3),
