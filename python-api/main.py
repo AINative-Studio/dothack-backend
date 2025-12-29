@@ -14,6 +14,7 @@ import sys
 from datetime import datetime
 from typing import Any
 
+from api.routes import participants
 from config import settings
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
@@ -72,6 +73,11 @@ app.add_middleware(
 )
 
 logger.info(f"CORS configured with allowed origins: {settings.ALLOWED_ORIGINS}")
+
+
+# Register API Routes
+app.include_router(participants.router)
+logger.info("Registered participant management routes")
 
 
 # Global Exception Handlers
