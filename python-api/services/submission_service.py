@@ -127,6 +127,27 @@ async def create_submission(
             f"in hackathon {hackathon_id}"
         )
 
+        # Generate embedding for the submission
+        try:
+            from services.embedding_service import generate_submission_embedding
+
+            await generate_submission_embedding(
+                zerodb_client=zerodb_client,
+                submission_id=submission_id,
+                hackathon_id=hackathon_id,
+                title=project_name.strip(),
+                description=description.strip(),
+                project_details=None,  # No project details at creation
+                team_id=team_id,
+                status="DRAFT",
+            )
+            logger.info(f"Generated embedding for submission {submission_id}")
+        except Exception as e:
+            # Log error but don't fail submission creation
+            logger.warning(
+                f"Failed to generate embedding for submission {submission_id}: {str(e)}"
+            )
+
         # Fetch and return created submission
         submissions = await zerodb_client.tables.query_rows(
             "submissions",
@@ -419,14 +440,38 @@ async def update_submission(
 
         logger.info(f"Updated submission {submission_id}")
 
-        # Fetch and return updated submission
+        # Fetch updated submission
         updated_submissions = await zerodb_client.tables.query_rows(
             "submissions",
             filter={"submission_id": submission_id},
             limit=1
         )
 
-        return updated_submissions[0]
+        updated_submission = updated_submissions[0]
+
+        # Update embedding if text fields changed
+        if project_name is not None or description is not None:
+            try:
+                from services.embedding_service import update_submission_embedding
+
+                await update_submission_embedding(
+                    zerodb_client=zerodb_client,
+                    submission_id=submission_id,
+                    hackathon_id=updated_submission.get("hackathon_id"),
+                    title=updated_submission.get("project_name", ""),
+                    description=updated_submission.get("description", ""),
+                    project_details=None,  # Could be extended to include repository info
+                    team_id=updated_submission.get("team_id"),
+                    status=updated_submission.get("status", "DRAFT"),
+                )
+                logger.info(f"Updated embedding for submission {submission_id}")
+            except Exception as e:
+                # Log error but don't fail submission update
+                logger.warning(
+                    f"Failed to update embedding for submission {submission_id}: {str(e)}"
+                )
+
+        return updated_submission
 
     except ValueError:
         # Re-raise validation errors
@@ -513,6 +558,22 @@ async def delete_submission(
             raise HTTPException(
                 status_code=http_status.HTTP_400_BAD_REQUEST,
                 detail="Cannot delete a submission that has been scored",
+            )
+
+        # Delete embedding first
+        try:
+            from services.embedding_service import delete_submission_embedding
+
+            await delete_submission_embedding(
+                zerodb_client=zerodb_client,
+                submission_id=submission_id,
+                hackathon_id=submission.get("hackathon_id"),
+            )
+            logger.info(f"Deleted embedding for submission {submission_id}")
+        except Exception as e:
+            # Log error but don't fail submission deletion
+            logger.warning(
+                f"Failed to delete embedding for submission {submission_id}: {str(e)}"
             )
 
         # Delete submission
