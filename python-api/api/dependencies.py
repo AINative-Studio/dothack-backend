@@ -209,14 +209,18 @@ async def get_current_user_optional(request: Request) -> Optional[dict[str, Any]
         if not auth_header:
             return None
 
-        scheme, _, token = auth_header.partition(" ")
-        if scheme.lower() != "bearer":
+        parts = auth_header.partition(" ")
+        if len(parts) < 3:
+            return None
+
+        scheme, _, token = parts
+        if not token or scheme.lower() != "bearer":
             return None
 
         credentials = HTTPAuthorizationCredentials(scheme=scheme, credentials=token)
         return await get_current_user(request, credentials)
 
-    except HTTPException:
+    except (HTTPException, AINativeAuthError):
         # Authentication failed - return None instead of raising
         logger.debug(
             "Optional authentication failed, returning None",
