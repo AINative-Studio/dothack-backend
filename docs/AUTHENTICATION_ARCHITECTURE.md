@@ -372,6 +372,18 @@ async def update_hackathon(
 5. Frontend stores token and uses it for subsequent requests
 ```
 
+**📖 Complete OAuth Implementation Guide**
+
+For comprehensive documentation of OAuth flows including:
+- Detailed architecture diagrams with all 8 steps
+- Step-by-step frontend integration code
+- Complete React components for OAuth buttons and callbacks
+- Backend token exchange implementation
+- Security best practices (CSRF, token storage)
+- Error handling and troubleshooting guide
+
+**See:** `/docs/OAUTH_FLOWS.md`
+
 ---
 
 ## API Reference
