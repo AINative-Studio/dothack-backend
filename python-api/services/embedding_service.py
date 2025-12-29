@@ -94,14 +94,14 @@ async def generate_submission_embedding(
         )
 
         # Generate embedding using ZeroDB Embeddings API
-        embedding_result = await zerodb_client.embeddings.generate(
-            text=combined_text,
-            model=DEFAULT_MODEL,
+        embeddings = await zerodb_client.embeddings.generate(
+            texts=[combined_text]
         )
 
-        embedding_vector = embedding_result.get("embedding")
-        if not embedding_vector:
+        if not embeddings or len(embeddings) == 0:
             raise ValueError("Embedding generation returned no vector")
+
+        embedding_vector = embeddings[0]
 
         # Prepare metadata for vector storage
         metadata = {
@@ -382,14 +382,14 @@ async def search_similar_submissions(
         )
 
         # Generate embedding for query
-        embedding_result = await zerodb_client.embeddings.generate(
-            text=query_text.strip(),
-            model=DEFAULT_MODEL,
+        query_embeddings = await zerodb_client.embeddings.generate(
+            texts=[query_text.strip()]
         )
 
-        query_vector = embedding_result.get("embedding")
-        if not query_vector:
+        if not query_embeddings or len(query_embeddings) == 0:
             raise ValueError("Query embedding generation returned no vector")
+
+        query_vector = query_embeddings[0]
 
         # Build metadata filter
         filter_dict = {}
@@ -538,12 +538,12 @@ async def batch_generate_embeddings(
             metadata_list.append(metadata)
 
         # Generate embeddings in batch
-        batch_result = await zerodb_client.embeddings.batch_generate(
-            texts=texts,
-            model=DEFAULT_MODEL,
+        embeddings = await zerodb_client.embeddings.generate(
+            texts=texts
         )
 
-        embeddings = batch_result.get("embeddings", [])
+        if not embeddings:
+            embeddings = []
 
         if len(embeddings) != len(submissions):
             raise ValueError(
