@@ -14,7 +14,18 @@ import sys
 from datetime import datetime
 from typing import Any
 
-from api.routes import analytics, export, files, participants, recommendations, search
+from api.routes import (
+    analytics,
+    export,
+    files,
+    hackathons,
+    judging,
+    participants,
+    recommendations,
+    search,
+    submissions,
+    teams,
+)
 from config import settings
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
@@ -64,9 +75,10 @@ app = FastAPI(
 
 
 # CORS Configuration
+allowed_origins = [origin.strip() for origin in settings.ALLOWED_ORIGINS.split(",")]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.ALLOWED_ORIGINS,
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -76,18 +88,27 @@ logger.info(f"CORS configured with allowed origins: {settings.ALLOWED_ORIGINS}")
 
 
 # Register API Routes
+app.include_router(hackathons.router)
 app.include_router(participants.router)
 app.include_router(analytics.router)
 app.include_router(export.router)
-logger.info("Registered analytics routes")
-logger.info("Registered export routes")
 app.include_router(search.router)
 app.include_router(recommendations.router)
 app.include_router(files.router)
+app.include_router(teams.router)
+app.include_router(judging.router)
+app.include_router(submissions.router)
+
+logger.info("Registered hackathon CRUD routes")
 logger.info("Registered participant management routes")
+logger.info("Registered analytics routes")
+logger.info("Registered export routes")
 logger.info("Registered search routes")
 logger.info("Registered recommendations routes")
 logger.info("Registered file upload routes")
+logger.info("Registered team management routes")
+logger.info("Registered judging routes")
+logger.info("Registered submission routes")
 
 
 # Global Exception Handlers
@@ -170,6 +191,32 @@ async def general_exception_handler(request: Request, exc: Exception) -> JSONRes
             }
         },
     )
+
+
+# Root Endpoint
+@app.get("/", tags=["Root"])
+async def root() -> dict[str, Any]:
+    """
+    API root endpoint.
+
+    Returns:
+        Dictionary with API information and available endpoints
+
+    Response Schema:
+        {
+            "name": "DotHack Backend API",
+            "version": "v1",
+            "status": "running",
+            "docs": "/v1/docs"
+        }
+    """
+    return {
+        "name": "DotHack Backend API",
+        "version": settings.API_VERSION,
+        "status": "running",
+        "docs": f"/{settings.API_VERSION}/docs",
+        "openapi": "/openapi.json",
+    }
 
 
 # Health Check Endpoint

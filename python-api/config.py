@@ -6,7 +6,7 @@ and type checking.
 """
 
 
-from pydantic import Field, validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -65,22 +65,8 @@ class Settings(BaseSettings):
         extra="ignore",  # Ignore extra fields in .env
     )
 
-    @validator("ALLOWED_ORIGINS", pre=True)
-    def parse_cors_origins(cls, v: str) -> list[str]:
-        """
-        Parse comma-separated CORS origins into a list.
-
-        Args:
-            v: Comma-separated string of origins
-
-        Returns:
-            List of origin strings
-        """
-        if isinstance(v, str):
-            return [origin.strip() for origin in v.split(",") if origin.strip()]
-        return v
-
-    @validator("LOG_LEVEL")
+    @field_validator("LOG_LEVEL")
+    @classmethod
     def validate_log_level(cls, v: str) -> str:
         """
         Validate log level is one of the standard Python logging levels.

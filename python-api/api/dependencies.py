@@ -21,6 +21,7 @@ from integrations.ainative.exceptions import (
     AINativeTimeoutError,
     format_error_response
 )
+from integrations.zerodb.dependencies import get_zerodb_client as _get_zerodb_client
 
 # Configure structured logging
 logger = logging.getLogger(__name__)
@@ -262,3 +263,7 @@ async def get_api_key(request: Request) -> str:
         )
 
     return api_key
+
+
+# Re-export ZeroDB dependency for convenience
+get_zerodb_client = _get_zerodb_client

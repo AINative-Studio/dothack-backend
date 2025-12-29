@@ -17,7 +17,7 @@ from api.schemas.recommendations import (
     TeamSuggestionsRequest,
     TeamSuggestionsResponse,
 )
-from integrations.ainative.dependencies import get_current_user
+from api.dependencies import get_current_user
 from integrations.zerodb.client import ZeroDBClient
 from integrations.zerodb.dependencies import get_zerodb_client
 from services.recommendations_service import RecommendationsService
