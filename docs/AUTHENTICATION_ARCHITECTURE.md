@@ -42,43 +42,168 @@
 
 ## Architecture Overview
 
+### High-Level System Architecture
+
 ```
-┌──────────────────────────────────────────────────────────────┐
-│                    DotHack Frontend                          │
-│              (Web App / Mobile App)                          │
-└───────────────────────────┬──────────────────────────────────┘
-                            │
-                            │ 1. User clicks "Login with GitHub"
-                            │
-                    ┌───────▼────────┐
-                    │   AINative     │
-                    │   Auth API     │ ← All authentication here
-                    │ /v1/auth/*     │
-                    └───────┬────────┘
-                            │
-                            │ 2. Returns JWT token
-                            │
-┌───────────────────────────▼──────────────────────────────────┐
-│                    DotHack Backend                           │
-│                   (Python FastAPI)                           │
-│                                                              │
-│  ┌────────────────────────────────────────────────────┐    │
-│  │  Authentication Middleware                          │    │
-│  │  1. Extract token from Authorization header        │    │
-│  │  2. Verify token via AINative /v1/auth/me         │    │
-│  │  3. Get user info (id, email, name)               │    │
-│  │  4. Look up user role in hackathon_participants   │    │
-│  │  5. Grant/deny access based on role               │    │
-│  └────────────────────────────────────────────────────┘    │
-│                                                              │
-└───────────────────────────┬──────────────────────────────────┘
-                            │
-                            │ 3. Query user role
-                            │
-                    ┌───────▼────────┐
-                    │    ZeroDB      │
-                    │  (Data Layer)  │ ← Store roles here
-                    └────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                          DotHack Ecosystem                               │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────┐         ┌──────────────────┐         ┌──────────────┐
+│  Web Frontend    │         │  Mobile App      │         │  CLI Tools   │
+│  (React/Next.js) │         │  (React Native)  │         │  (Python)    │
+└────────┬─────────┘         └────────┬─────────┘         └──────┬───────┘
+         │                            │                           │
+         └────────────────────────────┼───────────────────────────┘
+                                      │
+                        1. User Authentication Flow
+                                      │
+                  ┌───────────────────▼───────────────────┐
+                  │     AINative Authentication API       │
+                  │    https://api.ainative.studio        │
+                  │                                       │
+                  │  ┌─────────────────────────────────┐ │
+                  │  │  /v1/auth/register             │ │
+                  │  │  /v1/auth/login                │ │
+                  │  │  /v1/auth/me (verify token)    │ │
+                  │  │  /v1/auth/refresh              │ │
+                  │  │  /v1/auth/github/callback      │ │
+                  │  │  /v1/auth/linkedin/callback    │ │
+                  │  └─────────────────────────────────┘ │
+                  │                                       │
+                  │  Returns: JWT Token + User Info       │
+                  └───────────────────┬───────────────────┘
+                                      │
+                        2. JWT Token Response
+                                      │
+         ┌────────────────────────────▼────────────────────────────┐
+         │                DotHack Backend API                      │
+         │              (Python FastAPI + ZeroDB)                  │
+         │                                                         │
+         │  ┌──────────────────────────────────────────────────┐  │
+         │  │          Authentication Middleware                │  │
+         │  │                                                   │  │
+         │  │  Step 1: Extract token from:                     │  │
+         │  │    • Authorization: Bearer {token}               │  │
+         │  │    • X-API-Key: {api_key}                        │  │
+         │  │                                                   │  │
+         │  │  Step 2: Verify with AINative                    │  │
+         │  │    GET /v1/auth/me                               │  │
+         │  │    → Returns user: {id, email, name}             │  │
+         │  │                                                   │  │
+         │  │  Step 3: Check role in ZeroDB                    │  │
+         │  │    Query hackathon_participants                  │  │
+         │  │    WHERE participant_id = user.id                │  │
+         │  │                                                   │  │
+         │  │  Step 4: Grant/Deny Access                       │  │
+         │  │    ✓ Role matches requirement                    │  │
+         │  │    ✗ Return 403 Forbidden                        │  │
+         │  └──────────────────────────────────────────────────┘  │
+         │                                                         │
+         │  ┌──────────────────────────────────────────────────┐  │
+         │  │            Protected Endpoints                    │  │
+         │  │                                                   │  │
+         │  │  • POST /api/v1/hackathons                       │  │
+         │  │  • POST /api/v1/hackathons/{id}/join             │  │
+         │  │  • PATCH /api/v1/hackathons/{id}                 │  │
+         │  │  • POST /api/v1/projects/{id}/submit             │  │
+         │  │  • POST /api/v1/submissions/{id}/score           │  │
+         │  └──────────────────────────────────────────────────┘  │
+         └─────────────────────────┬───────────────────────────────┘
+                                   │
+                     3. Query/Store Role Data
+                                   │
+                  ┌────────────────▼────────────────┐
+                  │         ZeroDB Storage          │
+                  │  (NoSQL + Vector + PostgreSQL)  │
+                  │                                 │
+                  │  Table: hackathon_participants  │
+                  │  {                              │
+                  │    hackathon_id: uuid,          │
+                  │    participant_id: uuid,  ◄─────┼─── AINative user.id
+                  │    role: ORGANIZER|BUILDER|     │
+                  │          JUDGE|MENTOR,          │
+                  │    metadata: {                  │
+                  │      ainative_user_email,       │
+                  │      ainative_user_name         │
+                  │    }                            │
+                  │  }                              │
+                  └─────────────────────────────────┘
+```
+
+### Detailed Authentication Flow
+
+```
+┌─────────────┐
+│   Client    │
+│ (Frontend)  │
+└──────┬──────┘
+       │
+       │ 1. POST /v1/auth/login
+       │    { email, password }
+       │
+       ▼
+┌─────────────────────────┐
+│  AINative Auth API      │
+│                         │
+│  1. Validate password   │
+│  2. Generate JWT token  │
+│  3. Create session      │
+└────────┬────────────────┘
+         │
+         │ 2. Response
+         │    { access_token, refresh_token, user }
+         │
+         ▼
+┌─────────────┐
+│   Client    │
+│  Stores:    │
+│  - JWT      │
+│  - Refresh  │
+└──────┬──────┘
+       │
+       │ 3. POST /api/v1/hackathons
+       │    Authorization: Bearer {JWT}
+       │    { name: "My Hackathon" }
+       │
+       ▼
+┌─────────────────────────────────┐
+│  DotHack Backend                │
+│                                 │
+│  get_current_user() dependency: │
+│                                 │
+│  1. Extract JWT from header     │
+│  2. GET /v1/auth/me (AINative)  │
+│     Authorization: Bearer {JWT} │
+└────────┬────────────────────────┘
+         │
+         │ 4. Response
+         │    { id: "uuid", email: "user@example.com", ... }
+         │
+         ▼
+┌─────────────────────────────────┐
+│  DotHack Backend                │
+│                                 │
+│  1. Create hackathon in ZeroDB  │
+│  2. Add user as ORGANIZER       │
+│     INSERT INTO                 │
+│     hackathon_participants      │
+│     {                           │
+│       hackathon_id,             │
+│       participant_id: user.id   │
+│       role: "ORGANIZER"         │
+│     }                           │
+└────────┬────────────────────────┘
+         │
+         │ 5. Response
+         │    { hackathon_id, name, status, ... }
+         │
+         ▼
+┌─────────────┐
+│   Client    │
+│  Displays   │
+│  Hackathon  │
+└─────────────┘
 ```
 
 ---
@@ -372,6 +497,18 @@ async def update_hackathon(
 5. Frontend stores token and uses it for subsequent requests
 ```
 
+**📖 Complete OAuth Implementation Guide**
+
+For comprehensive documentation of OAuth flows including:
+- Detailed architecture diagrams with all 8 steps
+- Step-by-step frontend integration code
+- Complete React components for OAuth buttons and callbacks
+- Backend token exchange implementation
+- Security best practices (CSRF, token storage)
+- Error handling and troubleshooting guide
+
+**See:** `/docs/OAUTH_FLOWS.md`
+
 ---
 
 ## API Reference
@@ -380,41 +517,256 @@ async def update_hackathon(
 
 **Base URL:** `https://api.ainative.studio`
 
-| Endpoint | Method | Auth | Purpose |
-|----------|--------|------|---------|
-| `/v1/auth/register` | POST | None | Register new user |
-| `/v1/auth/login` | POST | None | Login with email/password |
-| `/v1/auth/logout` | POST | Bearer | Logout (blacklist token) |
-| `/v1/auth/refresh` | POST | None | Refresh access token |
-| `/v1/auth/me` | GET | Bearer | Get current user (verify token) |
-| `/v1/auth/github/callback` | POST | None | GitHub OAuth callback |
-| `/v1/auth/linkedin/callback` | POST | None | LinkedIn OAuth callback |
+#### 1. Register User
+```http
+POST /v1/auth/register
+Content-Type: application/json
+
+{
+  "email": "user@example.com",
+  "password": "SecurePass123!",
+  "name": "John Doe"
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "bearer",
+  "user": {
+    "id": "uuid",
+    "email": "user@example.com",
+    "name": "John Doe",
+    "email_verified": false,
+    "created_at": "2025-12-28T10:00:00Z"
+  }
+}
+```
+
+**Errors:**
+- `400`: Validation error (weak password, invalid email)
+- `409`: Email already registered
+
+---
+
+#### 2. Login
+```http
+POST /v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "user@example.com",
+  "password": "SecurePass123!"
+}
+```
+
+**Response (200 OK):** Same as registration
+
+**Errors:**
+- `401`: Invalid credentials
+- `403`: Email not verified
+
+---
+
+#### 3. Get Current User (Token Verification)
+```http
+GET /v1/auth/me
+Authorization: Bearer {access_token}
+```
+
+**Response (200 OK):**
+```json
+{
+  "id": "uuid",
+  "email": "user@example.com",
+  "name": "John Doe",
+  "email_verified": true,
+  "created_at": "2025-12-28T10:00:00Z"
+}
+```
+
+**Errors:**
+- `401`: Invalid or expired token
+
+---
+
+#### 4. Refresh Token
+```http
+POST /v1/auth/refresh
+Content-Type: application/json
+
+{
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "access_token": "new_access_token...",
+  "token_type": "bearer"
+}
+```
+
+**Errors:**
+- `401`: Invalid or expired refresh token
+
+---
+
+#### 5. Logout
+```http
+POST /v1/auth/logout
+Authorization: Bearer {access_token}
+```
+
+**Response (200 OK):**
+```json
+{
+  "message": "Successfully logged out"
+}
+```
+
+---
+
+#### 6. GitHub OAuth Callback
+```http
+POST /v1/auth/github/callback
+Content-Type: application/json
+
+{
+  "code": "authorization_code_from_github",
+  "redirect_uri": "https://dothack.ainative.studio/auth/callback"
+}
+```
+
+**Response (200 OK):** Same as login response
+
+**Errors:**
+- `400`: Invalid authorization code
+- `500`: GitHub API error
+
+---
+
+#### 7. LinkedIn OAuth Callback
+```http
+POST /v1/auth/linkedin/callback
+Content-Type: application/json
+
+{
+  "code": "authorization_code_from_linkedin",
+  "redirect_uri": "https://dothack.ainative.studio/auth/callback"
+}
+```
+
+**Response (200 OK):** Same as login response
+
+**Errors:**
+- `400`: Invalid authorization code
+- `500`: LinkedIn API error
+
+---
 
 ### DotHack Endpoints (with AINative Auth)
 
-| Endpoint | Method | Auth | Role Required |
-|----------|--------|------|---------------|
-| `POST /api/v1/hackathons` | POST | Bearer | None (creates ORGANIZER) |
-| `POST /api/v1/hackathons/{id}/join` | POST | Bearer | None (creates BUILDER) |
-| `PATCH /api/v1/hackathons/{id}` | PATCH | Bearer | ORGANIZER |
-| `POST /api/v1/hackathons/{id}/tracks` | POST | Bearer | ORGANIZER |
-| `POST /api/v1/projects/{id}/submit` | POST | Bearer | BUILDER (team member) |
-| `POST /api/v1/submissions/{id}/score` | POST | Bearer | JUDGE |
+All DotHack endpoints accept **two authentication methods**:
+
+1. **JWT Token:** `Authorization: Bearer {token}`
+2. **API Key:** `X-API-Key: {api_key}` or `Authorization: Bearer {api_key}`
+
+#### Health Check
+```http
+GET /health
+```
+
+**Response (200 OK):**
+```json
+{
+  "status": "healthy",
+  "timestamp": "2025-12-28T10:00:00.000000"
+}
+```
+
+#### Protected Endpoints (Coming Soon)
+
+| Endpoint | Method | Auth | Role Required | Description |
+|----------|--------|------|---------------|-------------|
+| `POST /api/v1/hackathons` | POST | Bearer | None | Create hackathon (auto ORGANIZER) |
+| `POST /api/v1/hackathons/{id}/join` | POST | Bearer | None | Join hackathon (creates BUILDER) |
+| `PATCH /api/v1/hackathons/{id}` | PATCH | Bearer | ORGANIZER | Update hackathon |
+| `POST /api/v1/hackathons/{id}/tracks` | POST | Bearer | ORGANIZER | Create tracks |
+| `POST /api/v1/projects/{id}/submit` | POST | Bearer | BUILDER | Submit project |
+| `POST /api/v1/submissions/{id}/score` | POST | Bearer | JUDGE | Score submission |
 
 ---
 
 ## Environment Variables
 
+### Required Variables
+
 ```bash
+# Application Settings
+ENVIRONMENT=development|staging|production
+LOG_LEVEL=DEBUG|INFO|WARNING|ERROR|CRITICAL
+API_VERSION=v1
+
+# Server Configuration
+HOST=0.0.0.0
+PORT=8000
+
+# CORS Settings
+ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
+
 # AINative Authentication
 AINATIVE_API_URL=https://api.ainative.studio
 AINATIVE_API_KEY=your_api_key_here  # For server-to-server calls (optional)
 
-# ZeroDB
+# ZeroDB Configuration
 ZERODB_API_KEY=your_zerodb_api_key
 ZERODB_PROJECT_ID=your_project_uuid
 ZERODB_BASE_URL=https://api.ainative.studio
+ZERODB_TIMEOUT=30.0
 ```
+
+### Optional Variables (External Services)
+
+```bash
+# HubSpot Integration
+HUBSPOT_API_URL=https://api.hubapi.com
+HUBSPOT_API_KEY=your_hubspot_key
+
+# Clearbit Integration
+CLEARBIT_API_URL=https://person.clearbit.com
+CLEARBIT_API_KEY=your_clearbit_key
+
+# Apollo Integration
+APOLLO_API_URL=https://api.apollo.io
+APOLLO_API_KEY=your_apollo_key
+
+# Resend Email
+RESEND_API_URL=https://api.resend.com
+RESEND_API_KEY=your_resend_key
+```
+
+### Environment Variable Validation
+
+The application validates all environment variables at startup using Pydantic:
+
+```python
+from config import settings
+
+# Access validated settings
+print(settings.AINATIVE_API_URL)  # https://api.ainative.studio
+print(settings.LOG_LEVEL)  # INFO (validated against allowed levels)
+print(settings.ALLOWED_ORIGINS)  # ['http://localhost:3000', ...]
+```
+
+**Validation Rules:**
+- `LOG_LEVEL` must be one of: DEBUG, INFO, WARNING, ERROR, CRITICAL
+- `ALLOWED_ORIGINS` is comma-separated, automatically parsed into a list
+- Missing required variables will cause startup failure
+- Extra variables in `.env` are ignored (won't cause errors)
 
 ---
 
@@ -470,6 +822,234 @@ curl -X POST https://dothack-api.ainative.studio/api/v1/hackathons \
 
 ---
 
+## Troubleshooting Guide
+
+### Common Issues
+
+#### 1. "Invalid or expired token" Error
+
+**Symptoms:**
+- HTTP 401 response when calling protected endpoints
+- Error message: "Invalid or expired token"
+
+**Possible Causes:**
+1. **Expired Token:** JWT tokens expire after a set duration
+2. **Invalid Token:** Token was manually modified or corrupted
+3. **Logged Out:** User logged out, token is blacklisted
+4. **Network Issues:** AINative API unreachable
+
+**Solutions:**
+```python
+# Frontend: Implement automatic token refresh
+async def api_call_with_retry(url, token):
+    response = await http.get(url, headers={"Authorization": f"Bearer {token}"})
+
+    if response.status == 401:
+        # Try refreshing token
+        new_token = await refresh_access_token(refresh_token)
+
+        # Retry with new token
+        response = await http.get(url, headers={"Authorization": f"Bearer {new_token}"})
+
+    return response
+
+# Backend: Implement token caching (5-minute TTL)
+from cachetools import TTLCache
+
+user_cache = TTLCache(maxsize=1000, ttl=300)  # 5 minutes
+
+async def get_current_user(token: str):
+    if token in user_cache:
+        return user_cache[token]
+
+    user = await auth_client.verify_token(token)
+    if user:
+        user_cache[token] = user
+
+    return user
+```
+
+---
+
+#### 2. "Connection refused" to AINative API
+
+**Symptoms:**
+- Network errors when calling `/v1/auth/me`
+- Timeout exceptions
+
+**Possible Causes:**
+1. **Wrong URL:** `AINATIVE_API_URL` points to incorrect environment
+2. **Firewall:** Network blocks outbound HTTPS
+3. **API Downtime:** AINative service temporarily unavailable
+
+**Solutions:**
+```bash
+# 1. Check environment configuration
+echo $AINATIVE_API_URL  # Should be https://api.ainative.studio
+
+# 2. Test connectivity
+curl https://api.ainative.studio/health
+
+# 3. Check DNS resolution
+nslookup api.ainative.studio
+
+# 4. Implement retry with exponential backoff
+import httpx
+from tenacity import retry, stop_after_attempt, wait_exponential
+
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=2, max=10)
+)
+async def verify_token_with_retry(token: str):
+    async with httpx.AsyncClient() as client:
+        response = await client.get(
+            "https://api.ainative.studio/v1/auth/me",
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=10.0
+        )
+        return response.json()
+```
+
+---
+
+#### 3. CORS Errors in Frontend
+
+**Symptoms:**
+- Browser console: "CORS policy: No 'Access-Control-Allow-Origin' header"
+- Requests blocked by browser
+
+**Solutions:**
+```python
+# 1. Update ALLOWED_ORIGINS in .env
+ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173,https://dothack.ainative.studio
+
+# 2. Verify CORS middleware configuration in main.py
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.ALLOWED_ORIGINS,  # Must match frontend origin
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# 3. For development, use wildcard (NOT for production)
+ALLOWED_ORIGINS=*
+```
+
+---
+
+#### 4. "X-API-Key header required" Error
+
+**Symptoms:**
+- HTTP 401 when using API key authentication
+- Error message: "X-API-Key header required"
+
+**Possible Causes:**
+1. **Missing Header:** X-API-Key not included in request
+2. **Wrong Header Name:** Using `Authorization` instead of `X-API-Key`
+3. **Case Sensitivity:** Header name capitalization incorrect
+
+**Solutions:**
+```bash
+# Correct usage (choose ONE method):
+
+# Method 1: X-API-Key header
+curl -H "X-API-Key: your_api_key" https://api.dothack.ainative.studio/api/v1/hackathons
+
+# Method 2: Bearer token (API key as bearer)
+curl -H "Authorization: Bearer your_api_key" https://api.dothack.ainative.studio/api/v1/hackathons
+
+# Method 3: JWT token
+curl -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIs..." https://api.dothack.ainative.studio/api/v1/hackathons
+```
+
+---
+
+#### 5. Role Check Fails ("Only ORGANIZER can perform this action")
+
+**Symptoms:**
+- HTTP 403 Forbidden
+- User authenticated but action denied
+
+**Possible Causes:**
+1. **User Not Assigned Role:** No entry in `hackathon_participants` table
+2. **Wrong Role:** User has BUILDER role but needs ORGANIZER
+3. **Wrong Hackathon:** Checking role for different hackathon
+
+**Solutions:**
+```python
+# 1. Debug role checking
+async def check_organizer_role(hackathon_id: str, user_id: str):
+    # Query hackathon_participants
+    participant = await zerodb.tables.query_rows(
+        "hackathon_participants",
+        filter={
+            "hackathon_id": hackathon_id,
+            "participant_id": user_id
+        }
+    )
+
+    # Log for debugging
+    print(f"User {user_id} role in hackathon {hackathon_id}: {participant}")
+
+    if not participant:
+        raise HTTPException(403, "User not a participant")
+
+    if participant["role"] != "ORGANIZER":
+        raise HTTPException(403, f"Only ORGANIZER can perform this action (user has {participant['role']})")
+
+# 2. Grant organizer role when creating hackathon
+await zerodb.tables.insert_rows(
+    "hackathon_participants",
+    rows=[{
+        "hackathon_id": hackathon_id,
+        "participant_id": user_id,
+        "role": "ORGANIZER",  # Grant ORGANIZER role
+        "metadata": {
+            "ainative_user_email": user["email"],
+            "ainative_user_name": user["name"]
+        }
+    }]
+)
+```
+
+---
+
+### Debugging Tools
+
+#### 1. Test Token Verification
+```bash
+# Get user info from token
+TOKEN="your_jwt_token_here"
+
+curl -X GET https://api.ainative.studio/v1/auth/me \
+  -H "Authorization: Bearer $TOKEN" \
+  -v  # Verbose output shows full response
+```
+
+#### 2. Check Logs
+```bash
+# Backend logs show authentication attempts
+docker logs dothack-backend --tail 100 -f
+
+# Look for:
+# - "HTTP exception: 401" (auth failures)
+# - "Validation error" (malformed requests)
+# - "Unhandled exception" (bugs)
+```
+
+#### 3. Verify Environment Variables
+```bash
+# Print all environment variables
+python3 -c "from config import settings; print(vars(settings))"
+
+# Check specific variable
+python3 -c "from config import settings; print(settings.AINATIVE_API_URL)"
+```
+
+---
+
 ## FAQ
 
 **Q: Can we add custom authentication methods?**
@@ -485,10 +1065,22 @@ A: Handled by AINative `/v1/auth/forgot-password` and `/v1/auth/reset-password`.
 A: Yes. GitHub and LinkedIn OAuth are already implemented in AINative.
 
 **Q: What if AINative Auth API is down?**
-A: Implement retry logic with exponential backoff. Cache user info to reduce API calls.
+A: Implement retry logic with exponential backoff. Cache user info to reduce API calls (5-minute TTL recommended).
 
 **Q: Do we need to sync user data?**
 A: No. DotHack only stores `participant_id` (AINative user.id) in hackathon_participants. User profile data lives in AINative.
+
+**Q: How do I test authentication locally?**
+A: Use the test token `ALWAYS-WORKS-TOKEN-12345` which returns `admin@ainative.studio` user (development mode only).
+
+**Q: Can I use both JWT and API key authentication?**
+A: Yes. The `get_current_user` dependency checks X-API-Key header first, then falls back to JWT Bearer token.
+
+**Q: How long do tokens last?**
+A: Access tokens expire after 15 minutes. Refresh tokens expire after 7 days. Use `/v1/auth/refresh` to get new access tokens.
+
+**Q: Is email verification required?**
+A: No for development. Yes for production (login will return 403 if email not verified).
 
 ---
 
