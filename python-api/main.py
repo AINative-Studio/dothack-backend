@@ -19,6 +19,7 @@ from api.routes import (
     export,
     files,
     hackathons,
+    hackathon_themes,
     judging,
     participants,
     recommendations,
@@ -89,6 +90,7 @@ logger.info(f"CORS configured with allowed origins: {settings.ALLOWED_ORIGINS}")
 
 # Register API Routes
 app.include_router(hackathons.router)
+app.include_router(hackathon_themes.router)
 app.include_router(participants.router)
 app.include_router(analytics.router)
 app.include_router(export.router)
@@ -100,6 +102,7 @@ app.include_router(judging.router)
 app.include_router(submissions.router)
 
 logger.info("Registered hackathon CRUD routes")
+logger.info("Registered hackathon theme routes")
 logger.info("Registered participant management routes")
 logger.info("Registered analytics routes")
 logger.info("Registered export routes")
