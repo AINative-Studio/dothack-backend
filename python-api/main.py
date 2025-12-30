@@ -21,6 +21,7 @@ from api.routes import (
     hackathons,
     judging,
     participants,
+    projects,
     recommendations,
     search,
     submissions,
@@ -96,6 +97,7 @@ app.include_router(search.router)
 app.include_router(recommendations.router)
 app.include_router(files.router)
 app.include_router(teams.router)
+app.include_router(projects.router)
 app.include_router(judging.router)
 app.include_router(submissions.router)
 
@@ -107,6 +109,7 @@ logger.info("Registered search routes")
 logger.info("Registered recommendations routes")
 logger.info("Registered file upload routes")
 logger.info("Registered team management routes")
+logger.info("Registered project management routes")
 logger.info("Registered judging routes")
 logger.info("Registered submission routes")
 
