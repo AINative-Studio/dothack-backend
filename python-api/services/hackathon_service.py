@@ -35,6 +35,8 @@ async def create_hackathon(
     registration_deadline: Optional[datetime] = None,
     max_participants: Optional[int] = None,
     website_url: Optional[str] = None,
+    logo_url: Optional[str] = None,
+    is_online: bool = False,
     prizes: Optional[Dict[str, Any]] = None,
     rules: Optional[str] = None,
     status: str = "draft",
@@ -659,4 +661,244 @@ async def delete_hackathon(
         raise HTTPException(
             status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to delete hackathon. Please contact support.",
+        )
+
+
+async def upload_hackathon_logo(
+    zerodb_client: ZeroDBClient,
+    hackathon_id: str,
+    user_id: str,
+    file_content: bytes,
+    file_name: str,
+    content_type: str,
+) -> Dict[str, Any]:
+    """
+    Upload a logo for a hackathon (ORGANIZER only).
+
+    Validates image format and size, uploads to ZeroDB Files API,
+    generates presigned URL, and updates hackathon logo_url field.
+
+    Args:
+        zerodb_client: ZeroDB client instance
+        hackathon_id: UUID of hackathon
+        user_id: UUID of user attempting upload
+        file_content: Image file content as bytes
+        file_name: Original file name
+        content_type: MIME type of the image
+
+    Returns:
+        Dict with upload confirmation:
+        - success: True
+        - hackathon_id: ID of hackathon
+        - logo_url: URL of uploaded logo
+        - message: Confirmation message
+
+    Raises:
+        HTTPException: 400 for invalid image format/size
+        HTTPException: 403 if user is not ORGANIZER
+        HTTPException: 404 if hackathon not found
+        HTTPException: 500 for upload errors
+        HTTPException: 504 for timeout errors
+
+    Performance:
+        Should complete in < 2s for typical images
+    """
+    try:
+        # Step 1: Check authorization (ORGANIZER role required)
+        logger.info(f"Checking ORGANIZER authorization for user {user_id} on hackathon {hackathon_id}")
+        await check_organizer(
+            zerodb_client=zerodb_client,
+            user_id=user_id,
+            hackathon_id=hackathon_id,
+        )
+
+        # Step 2: Validate hackathon exists
+        hackathon = await get_hackathon(zerodb_client, hackathon_id)
+
+        # Step 3: Validate image format
+        allowed_types = ["image/jpeg", "image/jpg", "image/png", "image/svg+xml"]
+        if content_type not in allowed_types:
+            raise HTTPException(
+                status_code=http_status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid image format. Allowed: jpg, png, svg. Got: {content_type}",
+            )
+
+        # Step 4: Validate file size (max 5MB)
+        max_size = 5 * 1024 * 1024  # 5MB in bytes
+        file_size = len(file_content)
+        if file_size > max_size:
+            raise HTTPException(
+                status_code=http_status.HTTP_400_BAD_REQUEST,
+                detail=f"File too large. Max size: 5MB. File size: {file_size / 1024 / 1024:.2f}MB",
+            )
+
+        # Step 5: Upload to ZeroDB Files API
+        logger.info(f"Uploading logo for hackathon {hackathon_id} (size: {file_size} bytes)")
+        upload_result = await zerodb_client.files.upload_file(
+            file_name=file_name,
+            file_content=file_content,
+            content_type=content_type,
+            folder=f"hackathons/{hackathon_id}/logos",
+            metadata={
+                "hackathon_id": hackathon_id,
+                "uploaded_by": user_id,
+                "type": "logo",
+            },
+        )
+
+        file_id = upload_result.get("file_id")
+
+        # Step 6: Generate presigned URL (7-day expiration)
+        url_result = await zerodb_client.files.generate_presigned_url(
+            file_id=file_id,
+            expiration_seconds=7 * 24 * 3600,  # 7 days
+        )
+
+        logo_url = url_result.get("url")
+
+        # Step 7: Update hackathon logo_url
+        logger.info(f"Updating hackathon {hackathon_id} with logo URL")
+        await zerodb_client.tables.update_rows(
+            "hackathons",
+            filter={"hackathon_id": hackathon_id},
+            update={
+                "$set": {
+                    "logo_url": logo_url,
+                    "updated_at": datetime.utcnow().isoformat(),
+                }
+            },
+        )
+
+        logger.info(f"Successfully uploaded logo for hackathon {hackathon_id}")
+
+        return {
+            "success": True,
+            "hackathon_id": hackathon_id,
+            "logo_url": logo_url,
+            "message": "Logo uploaded successfully",
+        }
+
+    except HTTPException:
+        raise
+
+    except ZeroDBTimeoutError as e:
+        logger.error(f"Timeout uploading logo for hackathon {hackathon_id}: {str(e)}")
+        raise HTTPException(
+            status_code=http_status.HTTP_504_GATEWAY_TIMEOUT,
+            detail="Logo upload timed out. Please try again.",
+        )
+
+    except (ZeroDBError, ZeroDBNotFound) as e:
+        logger.error(
+            f"ZeroDB error uploading logo for hackathon {hackathon_id}: {str(e)}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to upload logo. Please contact support.",
+        )
+
+    except Exception as e:
+        logger.error(
+            f"Unexpected error uploading logo for hackathon {hackathon_id}: {str(e)}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to upload logo. Please contact support.",
+        )
+
+
+async def delete_hackathon_logo(
+    zerodb_client: ZeroDBClient,
+    hackathon_id: str,
+    user_id: str,
+) -> Dict[str, Any]:
+    """
+    Remove logo from a hackathon (ORGANIZER only).
+
+    Clears the logo_url field from the hackathon record.
+    Note: This does not delete the file from storage.
+
+    Args:
+        zerodb_client: ZeroDB client instance
+        hackathon_id: UUID of hackathon
+        user_id: UUID of user attempting deletion
+
+    Returns:
+        Dict with deletion confirmation:
+        - success: True
+        - hackathon_id: ID of hackathon
+        - message: Confirmation message
+
+    Raises:
+        HTTPException: 403 if user is not ORGANIZER
+        HTTPException: 404 if hackathon not found
+        HTTPException: 500 for database errors
+        HTTPException: 504 for timeout errors
+
+    Performance:
+        Should complete in < 200ms for typical operations
+    """
+    try:
+        # Step 1: Check authorization (ORGANIZER role required)
+        logger.info(f"Checking ORGANIZER authorization for user {user_id} on hackathon {hackathon_id}")
+        await check_organizer(
+            zerodb_client=zerodb_client,
+            user_id=user_id,
+            hackathon_id=hackathon_id,
+        )
+
+        # Step 2: Validate hackathon exists
+        hackathon = await get_hackathon(zerodb_client, hackathon_id)
+
+        # Step 3: Clear logo_url
+        logger.info(f"Removing logo from hackathon {hackathon_id}")
+        await zerodb_client.tables.update_rows(
+            "hackathons",
+            filter={"hackathon_id": hackathon_id},
+            update={
+                "$set": {
+                    "logo_url": None,
+                    "updated_at": datetime.utcnow().isoformat(),
+                }
+            },
+        )
+
+        logger.info(f"Successfully removed logo from hackathon {hackathon_id}")
+
+        return {
+            "success": True,
+            "hackathon_id": hackathon_id,
+            "message": "Logo removed successfully",
+        }
+
+    except HTTPException:
+        raise
+
+    except ZeroDBTimeoutError as e:
+        logger.error(f"Timeout removing logo from hackathon {hackathon_id}: {str(e)}")
+        raise HTTPException(
+            status_code=http_status.HTTP_504_GATEWAY_TIMEOUT,
+            detail="Logo removal timed out. Please try again.",
+        )
+
+    except (ZeroDBError, ZeroDBNotFound) as e:
+        logger.error(
+            f"ZeroDB error removing logo from hackathon {hackathon_id}: {str(e)}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to remove logo. Please contact support.",
+        )
+
+    except Exception as e:
+        logger.error(
+            f"Unexpected error removing logo from hackathon {hackathon_id}: {str(e)}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to remove logo. Please contact support.",
         )

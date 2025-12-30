@@ -50,6 +50,8 @@ def sample_hackathon_data():
         "registration_deadline": now + timedelta(days=25),
         "max_participants": 100,
         "website_url": "https://aihack2024.com",
+        "logo_url": None,
+        "is_online": True,
         "prizes": {"first": 10000, "second": 5000, "third": 2500},
         "rules": "All participants must follow code of conduct",
         "status": "draft",
@@ -72,6 +74,7 @@ def sample_hackathon_row(sample_hackathon_data):
     return {
         "hackathon_id": hackathon_id,
         **row_data,
+        "participant_count": 0,
         "is_deleted": False,
         "created_at": now.isoformat(),
         "updated_at": now.isoformat(),
