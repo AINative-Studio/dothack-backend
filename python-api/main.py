@@ -16,15 +16,21 @@ from typing import Any
 
 from api.routes import (
     analytics,
+    dashboard,
     export,
+    featured_hackathons,
     files,
     hackathons,
+    hackathon_themes,
+    invitations,
     judging,
     participants,
     recommendations,
+    rubrics,
     search,
     submissions,
     teams,
+    tracks,
 )
 from config import settings
 from fastapi import FastAPI, Request, status
@@ -89,26 +95,38 @@ logger.info(f"CORS configured with allowed origins: {settings.ALLOWED_ORIGINS}")
 
 # Register API Routes
 app.include_router(hackathons.router)
+app.include_router(hackathon_themes.router)
+app.include_router(tracks.router)
 app.include_router(participants.router)
+app.include_router(teams.router)
+app.include_router(submissions.router)
+app.include_router(judging.router)
+app.include_router(rubrics.router)
+app.include_router(invitations.router)
+app.include_router(featured_hackathons.router)
+app.include_router(dashboard.router)
 app.include_router(analytics.router)
 app.include_router(export.router)
 app.include_router(search.router)
 app.include_router(recommendations.router)
 app.include_router(files.router)
-app.include_router(teams.router)
-app.include_router(judging.router)
-app.include_router(submissions.router)
 
 logger.info("Registered hackathon CRUD routes")
+logger.info("Registered hackathon theme routes")
+logger.info("Registered tracks routes")
 logger.info("Registered participant management routes")
+logger.info("Registered team management routes")
+logger.info("Registered submission routes")
+logger.info("Registered judging routes")
+logger.info("Registered rubrics routes")
+logger.info("Registered invitations routes")
+logger.info("Registered featured hackathons routes")
+logger.info("Registered dashboard routes")
 logger.info("Registered analytics routes")
 logger.info("Registered export routes")
 logger.info("Registered search routes")
 logger.info("Registered recommendations routes")
 logger.info("Registered file upload routes")
-logger.info("Registered team management routes")
-logger.info("Registered judging routes")
-logger.info("Registered submission routes")
 
 
 # Global Exception Handlers
