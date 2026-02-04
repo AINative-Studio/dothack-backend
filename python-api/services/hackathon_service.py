@@ -35,6 +35,8 @@ async def create_hackathon(
     registration_deadline: Optional[datetime] = None,
     max_participants: Optional[int] = None,
     website_url: Optional[str] = None,
+    logo_url: Optional[str] = None,
+    is_online: bool = False,
     prizes: Optional[Dict[str, Any]] = None,
     rules: Optional[str] = None,
     status: str = "draft",
@@ -59,6 +61,8 @@ async def create_hackathon(
         registration_deadline: Optional registration cutoff
         max_participants: Optional participant limit (>= 1)
         website_url: Optional website URL
+        logo_url: Optional hackathon logo URL
+        is_online: Boolean flag for virtual/in-person (default: False)
         prizes: Optional prize information as dict
         rules: Optional rules text
         status: Initial status (default: "draft")
@@ -84,6 +88,7 @@ async def create_hackathon(
         ...     start_date=datetime(2025, 3, 1),
         ...     end_date=datetime(2025, 3, 3),
         ...     location="San Francisco",
+        ...     is_online=True,
         ...     status="draft"
         ... )
         >>> print(hackathon['hackathon_id'])
@@ -126,6 +131,9 @@ async def create_hackathon(
             "max_participants": max_participants,
             "location": location.strip(),
             "website_url": website_url,
+            "logo_url": logo_url,
+            "is_online": is_online,
+            "participant_count": 1,
             "prizes": prizes,
             "rules": rules,
             "status": status,

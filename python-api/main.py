@@ -25,6 +25,8 @@ from api.routes import (
     invitations,
     judging,
     participants,
+    prizes,
+    projects,
     recommendations,
     rubrics,
     search,
@@ -97,8 +99,10 @@ logger.info(f"CORS configured with allowed origins: {settings.ALLOWED_ORIGINS}")
 app.include_router(hackathons.router)
 app.include_router(hackathon_themes.router)
 app.include_router(tracks.router)
+app.include_router(prizes.router)
 app.include_router(participants.router)
 app.include_router(teams.router)
+app.include_router(projects.router)
 app.include_router(submissions.router)
 app.include_router(judging.router)
 app.include_router(rubrics.router)
@@ -114,8 +118,10 @@ app.include_router(files.router)
 logger.info("Registered hackathon CRUD routes")
 logger.info("Registered hackathon theme routes")
 logger.info("Registered tracks routes")
+logger.info("Registered prizes routes")
 logger.info("Registered participant management routes")
 logger.info("Registered team management routes")
+logger.info("Registered project management routes")
 logger.info("Registered submission routes")
 logger.info("Registered judging routes")
 logger.info("Registered rubrics routes")

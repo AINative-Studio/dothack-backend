@@ -36,6 +36,8 @@ class HackathonCreateRequest(BaseModel):
         max_participants: Optional participant limit
         location: Physical location or "virtual"
         website_url: Optional hackathon website URL
+        logo_url: Optional hackathon logo image URL
+        is_online: Boolean flag for virtual/in-person (defaults to False)
         prizes: Optional prize information (JSON object)
         rules: Optional rules and guidelines (text)
         status: Initial status (defaults to "draft")
@@ -49,6 +51,8 @@ class HackathonCreateRequest(BaseModel):
     max_participants: Optional[int] = Field(None, ge=1, description="Maximum participants")
     location: str = Field(..., min_length=1, max_length=200, description="Location or 'virtual'")
     website_url: Optional[str] = Field(None, max_length=500, description="Hackathon website")
+    logo_url: Optional[str] = Field(None, max_length=500, description="Hackathon logo URL")
+    is_online: bool = Field(default=False, description="Virtual/in-person flag")
     prizes: Optional[dict] = Field(None, description="Prize information (JSON)")
     rules: Optional[str] = Field(None, max_length=10000, description="Rules and guidelines")
     status: HackathonStatus = Field(default=HackathonStatus.DRAFT, description="Hackathon status")
@@ -105,6 +109,8 @@ class HackathonUpdateRequest(BaseModel):
         max_participants: Updated participant limit
         location: Updated location
         website_url: Updated website URL
+        logo_url: Updated logo URL
+        is_online: Updated virtual/in-person flag
         prizes: Updated prize information
         rules: Updated rules
         status: Updated status
@@ -117,6 +123,8 @@ class HackathonUpdateRequest(BaseModel):
     max_participants: Optional[int] = Field(None, ge=1)
     location: Optional[str] = Field(None, min_length=1, max_length=200)
     website_url: Optional[str] = Field(None, max_length=500)
+    logo_url: Optional[str] = Field(None, max_length=500)
+    is_online: Optional[bool] = None
     prizes: Optional[dict] = None
     rules: Optional[str] = Field(None, max_length=10000)
     status: Optional[HackathonStatus] = None
@@ -153,6 +161,9 @@ class HackathonResponse(BaseModel):
         max_participants: Maximum participants (if set)
         location: Location
         website_url: Website URL (if set)
+        logo_url: Logo image URL (if set)
+        is_online: Virtual/in-person flag
+        participant_count: Total number of participants
         prizes: Prize information (if set)
         rules: Rules and guidelines (if set)
         status: Current status
@@ -169,6 +180,9 @@ class HackathonResponse(BaseModel):
     max_participants: Optional[int]
     location: str
     website_url: Optional[str]
+    logo_url: Optional[str]
+    is_online: bool
+    participant_count: int
     prizes: Optional[dict]
     rules: Optional[str]
     status: str

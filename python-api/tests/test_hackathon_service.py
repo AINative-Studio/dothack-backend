@@ -50,6 +50,8 @@ def sample_hackathon_data():
         "registration_deadline": now + timedelta(days=25),
         "max_participants": 100,
         "website_url": "https://aihack2024.com",
+        "logo_url": "https://example.com/logo.png",
+        "is_online": True,
         "prizes": {"first": 10000, "second": 5000, "third": 2500},
         "rules": "All participants must follow code of conduct",
         "status": "draft",
@@ -648,3 +650,231 @@ class TestDeleteHackathon:
             )
 
         assert exc_info.value.status_code == 500
+
+
+# Tests for new fields (Issue #71)
+class TestHackathonNewFields:
+    """Tests for logo_url, is_online, and participant_count fields (Issue #71)."""
+
+    @pytest.mark.asyncio
+    async def test_create_hackathon_with_logo_url(self, mock_zerodb_client, sample_hackathon_data):
+        """Test creating hackathon with logo_url field."""
+        # Arrange
+        sample_hackathon_data["logo_url"] = "https://example.com/hackathon-logo.png"
+        mock_zerodb_client.tables.insert_rows = AsyncMock(
+            return_value={"success": True, "row_ids": [str(uuid.uuid4())]}
+        )
+
+        # Act
+        result = await create_hackathon(
+            zerodb_client=mock_zerodb_client,
+            **sample_hackathon_data,
+        )
+
+        # Assert
+        assert result["logo_url"] == "https://example.com/hackathon-logo.png"
+        assert "hackathon_id" in result
+
+    @pytest.mark.asyncio
+    async def test_create_hackathon_with_is_online_true(
+        self, mock_zerodb_client, sample_hackathon_data
+    ):
+        """Test creating online hackathon with is_online=True."""
+        # Arrange
+        sample_hackathon_data["is_online"] = True
+        mock_zerodb_client.tables.insert_rows = AsyncMock(
+            return_value={"success": True, "row_ids": [str(uuid.uuid4())]}
+        )
+
+        # Act
+        result = await create_hackathon(
+            zerodb_client=mock_zerodb_client,
+            **sample_hackathon_data,
+        )
+
+        # Assert
+        assert result["is_online"] is True
+        assert "hackathon_id" in result
+
+    @pytest.mark.asyncio
+    async def test_create_hackathon_with_is_online_false(
+        self, mock_zerodb_client, sample_hackathon_data
+    ):
+        """Test creating in-person hackathon with is_online=False."""
+        # Arrange
+        sample_hackathon_data["is_online"] = False
+        mock_zerodb_client.tables.insert_rows = AsyncMock(
+            return_value={"success": True, "row_ids": [str(uuid.uuid4())]}
+        )
+
+        # Act
+        result = await create_hackathon(
+            zerodb_client=mock_zerodb_client,
+            **sample_hackathon_data,
+        )
+
+        # Assert
+        assert result["is_online"] is False
+        assert "hackathon_id" in result
+
+    @pytest.mark.asyncio
+    async def test_create_hackathon_default_is_online(
+        self, mock_zerodb_client, sample_hackathon_data
+    ):
+        """Test is_online defaults to False when not provided."""
+        # Arrange
+        sample_hackathon_data.pop("is_online", None)
+        mock_zerodb_client.tables.insert_rows = AsyncMock(
+            return_value={"success": True, "row_ids": [str(uuid.uuid4())]}
+        )
+
+        # Act
+        result = await create_hackathon(
+            zerodb_client=mock_zerodb_client,
+            **sample_hackathon_data,
+        )
+
+        # Assert
+        assert result["is_online"] is False
+
+    @pytest.mark.asyncio
+    async def test_create_hackathon_participant_count_initialized(
+        self, mock_zerodb_client, sample_hackathon_data
+    ):
+        """Test participant_count is initialized to 1 (creator/organizer)."""
+        # Arrange
+        mock_zerodb_client.tables.insert_rows = AsyncMock(
+            return_value={"success": True, "row_ids": [str(uuid.uuid4())]}
+        )
+
+        # Act
+        result = await create_hackathon(
+            zerodb_client=mock_zerodb_client,
+            **sample_hackathon_data,
+        )
+
+        # Assert
+        assert result["participant_count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_create_hackathon_without_logo_url(
+        self, mock_zerodb_client, sample_hackathon_data
+    ):
+        """Test creating hackathon without logo_url (optional field)."""
+        # Arrange
+        sample_hackathon_data["logo_url"] = None
+        mock_zerodb_client.tables.insert_rows = AsyncMock(
+            return_value={"success": True, "row_ids": [str(uuid.uuid4())]}
+        )
+
+        # Act
+        result = await create_hackathon(
+            zerodb_client=mock_zerodb_client,
+            **sample_hackathon_data,
+        )
+
+        # Assert
+        assert result["logo_url"] is None
+        assert "hackathon_id" in result
+
+    @pytest.mark.asyncio
+    async def test_update_hackathon_logo_url(
+        self, mock_zerodb_client, sample_hackathon_row
+    ):
+        """Test updating hackathon logo_url."""
+        # Arrange
+        hackathon_id = sample_hackathon_row["hackathon_id"]
+        organizer_id = sample_hackathon_row["organizer_id"]
+        new_logo_url = "https://example.com/new-logo.png"
+
+        # Mock authorization and get hackathon
+        mock_zerodb_client.tables.query_rows = AsyncMock(
+            side_effect=[
+                [{"user_id": organizer_id, "role": "organizer", "hackathon_id": hackathon_id}],
+                [sample_hackathon_row],
+                [{**sample_hackathon_row, "logo_url": new_logo_url}],
+            ]
+        )
+
+        mock_zerodb_client.tables.update_rows = AsyncMock(return_value={"success": True})
+
+        # Act
+        result = await update_hackathon(
+            zerodb_client=mock_zerodb_client,
+            hackathon_id=hackathon_id,
+            user_id=organizer_id,
+            update_data={"logo_url": new_logo_url},
+        )
+
+        # Assert
+        assert result["logo_url"] == new_logo_url
+        mock_zerodb_client.tables.update_rows.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_update_hackathon_is_online(
+        self, mock_zerodb_client, sample_hackathon_row
+    ):
+        """Test updating hackathon is_online flag."""
+        # Arrange
+        hackathon_id = sample_hackathon_row["hackathon_id"]
+        organizer_id = sample_hackathon_row["organizer_id"]
+
+        # Mock authorization and get hackathon
+        mock_zerodb_client.tables.query_rows = AsyncMock(
+            side_effect=[
+                [{"user_id": organizer_id, "role": "organizer", "hackathon_id": hackathon_id}],
+                [sample_hackathon_row],
+                [{**sample_hackathon_row, "is_online": False}],
+            ]
+        )
+
+        mock_zerodb_client.tables.update_rows = AsyncMock(return_value={"success": True})
+
+        # Act
+        result = await update_hackathon(
+            zerodb_client=mock_zerodb_client,
+            hackathon_id=hackathon_id,
+            user_id=organizer_id,
+            update_data={"is_online": False},
+        )
+
+        # Assert
+        assert result["is_online"] is False
+        mock_zerodb_client.tables.update_rows.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_update_hackathon_multiple_new_fields(
+        self, mock_zerodb_client, sample_hackathon_row
+    ):
+        """Test updating multiple new fields at once."""
+        # Arrange
+        hackathon_id = sample_hackathon_row["hackathon_id"]
+        organizer_id = sample_hackathon_row["organizer_id"]
+        update_data = {
+            "logo_url": "https://example.com/updated-logo.png",
+            "is_online": False,
+        }
+
+        # Mock authorization and get hackathon
+        mock_zerodb_client.tables.query_rows = AsyncMock(
+            side_effect=[
+                [{"user_id": organizer_id, "role": "organizer", "hackathon_id": hackathon_id}],
+                [sample_hackathon_row],
+                [{**sample_hackathon_row, **update_data}],
+            ]
+        )
+
+        mock_zerodb_client.tables.update_rows = AsyncMock(return_value={"success": True})
+
+        # Act
+        result = await update_hackathon(
+            zerodb_client=mock_zerodb_client,
+            hackathon_id=hackathon_id,
+            user_id=organizer_id,
+            update_data=update_data,
+        )
+
+        # Assert
+        assert result["logo_url"] == "https://example.com/updated-logo.png"
+        assert result["is_online"] is False
+        mock_zerodb_client.tables.update_rows.assert_called_once()
