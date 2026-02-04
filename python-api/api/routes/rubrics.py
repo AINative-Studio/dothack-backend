@@ -13,7 +13,6 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from api.dependencies import get_current_user, get_zerodb_client
 from api.schemas.rubric import (
     ErrorResponse,
-    RubricActivateRequest,
     RubricCreateRequest,
     RubricListResponse,
     RubricResponse,

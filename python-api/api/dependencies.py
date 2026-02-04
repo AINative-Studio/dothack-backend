@@ -265,5 +265,47 @@ async def get_api_key(request: Request) -> str:
     return api_key
 
 
+async def require_admin(current_user: dict[str, Any] = Depends(get_current_user)) -> None:
+    """
+    Dependency that requires the current user to be an admin.
+
+    This dependency checks if the current user has ADMIN role.
+    Raises 403 Forbidden if the user is not an admin.
+
+    Args:
+        current_user: Current authenticated user from get_current_user
+
+    Raises:
+        HTTPException: 403 if user is not an admin
+
+    Example:
+        >>> @app.delete("/admin/users/{id}", dependencies=[Depends(require_admin)])
+        >>> async def delete_user(id: str):
+        ...     # Only admins can access this endpoint
+        ...     pass
+    """
+    user_role = current_user.get("role", "").upper()
+
+    if user_role != "ADMIN":
+        logger.warning(
+            f"User {current_user.get('id')} attempted admin action without ADMIN role",
+            extra={
+                "event": "authorization_failed",
+                "user_id": current_user.get("id"),
+                "user_role": user_role,
+                "required_role": "ADMIN",
+            },
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin privileges required",
+        )
+
+    logger.debug(
+        f"Admin authorization successful for user {current_user.get('id')}",
+        extra={"event": "authorization_success", "user_id": current_user.get("id")},
+    )
+
+
 # Re-export ZeroDB dependency for convenience
 get_zerodb_client = _get_zerodb_client
