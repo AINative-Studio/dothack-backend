@@ -179,6 +179,8 @@ async def create_hackathon(
         registration_deadline=request.registration_deadline,
         max_participants=request.max_participants,
         website_url=str(request.website_url) if request.website_url else None,
+        logo_url=str(request.logo_url) if request.logo_url else None,
+        is_online=request.is_online,
         prizes=request.prizes,
         rules=request.rules,
         status=request.status.value,
@@ -456,6 +458,9 @@ async def update_hackathon(
     # Convert URLs to strings
     if "website_url" in update_data and update_data["website_url"]:
         update_data["website_url"] = str(update_data["website_url"])
+
+    if "logo_url" in update_data and update_data["logo_url"]:
+        update_data["logo_url"] = str(update_data["logo_url"])
 
     hackathon = await hackathon_service.update_hackathon(
         zerodb_client=zerodb_client,
