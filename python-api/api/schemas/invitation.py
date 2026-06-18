@@ -9,7 +9,7 @@ from enum import Enum
 from typing import List, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class InvitationRole(str, Enum):
@@ -91,8 +91,7 @@ class InvitationResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class InvitationListResponse(BaseModel):
@@ -102,9 +101,13 @@ class InvitationListResponse(BaseModel):
     Attributes:
         invitations: List of invitation objects
         total: Total number of invitations
+        created: Number of invitations created (for create response)
+        skipped: Number of invitations skipped (for create response)
     """
     invitations: List[InvitationResponse]
     total: int = Field(..., ge=0, description="Total invitations")
+    created: int = Field(default=0, ge=0, description="Number created")
+    skipped: int = Field(default=0, ge=0, description="Number skipped")
 
 
 class InvitationCreateResponse(BaseModel):
@@ -139,10 +142,12 @@ class InvitationAcceptRequest(BaseModel):
 
     Attributes:
         token: Invitation token
-        user_id: User ID accepting the invitation (from auth)
+        email: Email of the user accepting
+        name: Name of the user accepting
     """
-    token: str = Field(..., min_length=32, max_length=256, description="Invitation token")
-    user_id: str = Field(..., description="User ID from authentication")
+    token: str = Field(..., min_length=1, max_length=256, description="Invitation token")
+    email: str = Field(..., description="Email of the user accepting")
+    name: str = Field(..., description="Name of the user accepting")
 
 
 class InvitationDeclineRequest(BaseModel):
@@ -152,7 +157,7 @@ class InvitationDeclineRequest(BaseModel):
     Attributes:
         token: Invitation token
     """
-    token: str = Field(..., min_length=32, max_length=256, description="Invitation token")
+    token: str = Field(..., min_length=1, max_length=256, description="Invitation token")
 
 
 class InvitationActionResponse(BaseModel):

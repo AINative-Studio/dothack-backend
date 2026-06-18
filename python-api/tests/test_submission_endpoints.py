@@ -10,9 +10,11 @@ from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from api.dependencies import get_current_user
 from api.routes.submissions import router
 from fastapi import status
 from fastapi.testclient import TestClient
+from main import app
 
 
 @pytest.fixture
@@ -22,8 +24,28 @@ def mock_user():
         "id": str(uuid.uuid4()),
         "email": "test@example.com",
         "name": "Test User",
+        "role": "ADMIN",
         "email_verified": True,
     }
+
+
+@pytest.fixture
+def auth_client(mock_user):
+    """Test client with auth and zerodb dependencies overridden."""
+    from api.routes.submissions import get_zerodb_client
+    from unittest.mock import MagicMock
+
+    async def override_auth():
+        return mock_user
+
+    def override_zerodb():
+        return MagicMock()
+
+    app.dependency_overrides[get_current_user] = override_auth
+    app.dependency_overrides[get_zerodb_client] = override_zerodb
+    yield TestClient(app)
+    app.dependency_overrides.pop(get_current_user, None)
+    app.dependency_overrides.pop(get_zerodb_client, None)
 
 
 @pytest.fixture
@@ -58,16 +80,12 @@ def mock_zerodb_client():
 class TestCreateSubmission:
     """Test POST /v1/submissions endpoint"""
 
-    @pytest.mark.asyncio
-    @patch("api.routes.submissions.get_current_user")
-    @patch("api.routes.submissions.get_zerodb_client")
-    @patch("services.submission_service.create_submission")
-    async def test_create_submission_success(
-        self, mock_create, mock_get_client, mock_get_user, mock_user, mock_submission_data
+    @patch("api.routes.submissions.create_submission")
+    def test_create_submission_success(
+        self, mock_create, auth_client, mock_user, mock_submission_data
     ):
         """Should create submission and return 201"""
         # Arrange
-        mock_get_user.return_value = mock_user
         mock_create.return_value = mock_submission_data
 
         request_data = {
@@ -79,10 +97,7 @@ class TestCreateSubmission:
         }
 
         # Act
-        from main import app
-
-        client = TestClient(app)
-        response = client.post(
+        response = auth_client.post(
             "/v1/submissions",
             json=request_data,
             headers={"Authorization": "Bearer test-token"},
@@ -94,22 +109,16 @@ class TestCreateSubmission:
         assert data["project_name"] == "AI Code Assistant"
         assert data["status"] == "DRAFT"
 
-    @pytest.mark.asyncio
-    @patch("api.routes.submissions.get_current_user")
-    async def test_create_submission_missing_required_fields(self, mock_get_user, mock_user):
+    def test_create_submission_missing_required_fields(self, auth_client, mock_user):
         """Should return 422 for missing required fields"""
         # Arrange
-        mock_get_user.return_value = mock_user
         request_data = {
             "team_id": str(uuid.uuid4()),
             # Missing hackathon_id, project_name, description
         }
 
         # Act
-        from main import app
-
-        client = TestClient(app)
-        response = client.post(
+        response = auth_client.post(
             "/v1/submissions",
             json=request_data,
             headers={"Authorization": "Bearer test-token"},
@@ -118,16 +127,12 @@ class TestCreateSubmission:
         # Assert
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
-    @pytest.mark.asyncio
-    @patch("api.routes.submissions.get_current_user")
-    @patch("api.routes.submissions.get_zerodb_client")
-    @patch("services.submission_service.create_submission")
-    async def test_create_submission_team_not_found(
-        self, mock_create, mock_get_client, mock_get_user, mock_user
+    @patch("api.routes.submissions.create_submission")
+    def test_create_submission_team_not_found(
+        self, mock_create, auth_client, mock_user
     ):
         """Should return 404 when team doesn't exist"""
         # Arrange
-        mock_get_user.return_value = mock_user
         from fastapi import HTTPException
 
         mock_create.side_effect = HTTPException(
@@ -142,10 +147,7 @@ class TestCreateSubmission:
         }
 
         # Act
-        from main import app
-
-        client = TestClient(app)
-        response = client.post(
+        response = auth_client.post(
             "/v1/submissions",
             json=request_data,
             headers={"Authorization": "Bearer test-token"},
@@ -154,8 +156,7 @@ class TestCreateSubmission:
         # Assert
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
-    @pytest.mark.asyncio
-    async def test_create_submission_unauthorized(self):
+    def test_create_submission_unauthorized(self):
         """Should return 401 without authentication"""
         # Arrange
         request_data = {
@@ -165,9 +166,8 @@ class TestCreateSubmission:
             "description": "Test description",
         }
 
-        # Act
-        from main import app
-
+        # Act - use client without overrides
+        app.dependency_overrides.pop(get_current_user, None)
         client = TestClient(app)
         response = client.post("/v1/submissions", json=request_data)
 
@@ -178,23 +178,16 @@ class TestCreateSubmission:
 class TestListSubmissions:
     """Test GET /v1/submissions endpoint"""
 
-    @pytest.mark.asyncio
-    @patch("api.routes.submissions.get_current_user")
-    @patch("api.routes.submissions.get_zerodb_client")
-    @patch("services.submission_service.list_submissions")
-    async def test_list_submissions_success(
-        self, mock_list, mock_get_client, mock_get_user, mock_user, mock_submission_data
+    @patch("api.routes.submissions.list_submissions")
+    def test_list_submissions_success(
+        self, mock_list, auth_client, mock_user, mock_submission_data
     ):
         """Should list submissions and return 200"""
         # Arrange
-        mock_get_user.return_value = mock_user
         mock_list.return_value = [mock_submission_data]
 
         # Act
-        from main import app
-
-        client = TestClient(app)
-        response = client.get(
+        response = auth_client.get(
             "/v1/submissions", headers={"Authorization": "Bearer test-token"}
         )
 
@@ -205,24 +198,17 @@ class TestListSubmissions:
         assert len(data["submissions"]) == 1
         assert data["total"] == 1
 
-    @pytest.mark.asyncio
-    @patch("api.routes.submissions.get_current_user")
-    @patch("api.routes.submissions.get_zerodb_client")
-    @patch("services.submission_service.list_submissions")
-    async def test_list_submissions_with_filters(
-        self, mock_list, mock_get_client, mock_get_user, mock_user, mock_submission_data
+    @patch("api.routes.submissions.list_submissions")
+    def test_list_submissions_with_filters(
+        self, mock_list, auth_client, mock_user, mock_submission_data
     ):
         """Should filter submissions by hackathon and status"""
         # Arrange
-        mock_get_user.return_value = mock_user
         mock_list.return_value = [mock_submission_data]
         hackathon_id = str(uuid.uuid4())
 
         # Act
-        from main import app
-
-        client = TestClient(app)
-        response = client.get(
+        response = auth_client.get(
             f"/v1/submissions?hackathon_id={hackathon_id}&status=SUBMITTED",
             headers={"Authorization": "Bearer test-token"},
         )
@@ -234,18 +220,10 @@ class TestListSubmissions:
         assert call_kwargs["hackathon_id"] == hackathon_id
         assert call_kwargs["status"] == "SUBMITTED"
 
-    @pytest.mark.asyncio
-    @patch("api.routes.submissions.get_current_user")
-    async def test_list_submissions_invalid_status(self, mock_get_user, mock_user):
+    def test_list_submissions_invalid_status(self, auth_client, mock_user):
         """Should return 400 for invalid status filter"""
-        # Arrange
-        mock_get_user.return_value = mock_user
-
         # Act
-        from main import app
-
-        client = TestClient(app)
-        response = client.get(
+        response = auth_client.get(
             "/v1/submissions?status=INVALID",
             headers={"Authorization": "Bearer test-token"},
         )
@@ -253,23 +231,16 @@ class TestListSubmissions:
         # Assert
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
-    @pytest.mark.asyncio
-    @patch("api.routes.submissions.get_current_user")
-    @patch("api.routes.submissions.get_zerodb_client")
-    @patch("services.submission_service.list_submissions")
-    async def test_list_submissions_pagination(
-        self, mock_list, mock_get_client, mock_get_user, mock_user
+    @patch("api.routes.submissions.list_submissions")
+    def test_list_submissions_pagination(
+        self, mock_list, auth_client, mock_user
     ):
         """Should support pagination parameters"""
         # Arrange
-        mock_get_user.return_value = mock_user
         mock_list.return_value = []
 
         # Act
-        from main import app
-
-        client = TestClient(app)
-        response = client.get(
+        response = auth_client.get(
             "/v1/submissions?skip=10&limit=20",
             headers={"Authorization": "Bearer test-token"},
         )
@@ -285,24 +256,17 @@ class TestListSubmissions:
 class TestGetSubmission:
     """Test GET /v1/submissions/{id} endpoint"""
 
-    @pytest.mark.asyncio
-    @patch("api.routes.submissions.get_current_user")
-    @patch("api.routes.submissions.get_zerodb_client")
-    @patch("services.submission_service.get_submission")
-    async def test_get_submission_success(
-        self, mock_get, mock_get_client, mock_get_user, mock_user, mock_submission_data
+    @patch("api.routes.submissions.get_submission")
+    def test_get_submission_success(
+        self, mock_get, auth_client, mock_user, mock_submission_data
     ):
         """Should get submission by ID and return 200"""
         # Arrange
-        mock_get_user.return_value = mock_user
         mock_get.return_value = mock_submission_data
         submission_id = mock_submission_data["submission_id"]
 
         # Act
-        from main import app
-
-        client = TestClient(app)
-        response = client.get(
+        response = auth_client.get(
             f"/v1/submissions/{submission_id}",
             headers={"Authorization": "Bearer test-token"},
         )
@@ -313,16 +277,12 @@ class TestGetSubmission:
         assert data["submission_id"] == submission_id
         assert data["project_name"] == "AI Code Assistant"
 
-    @pytest.mark.asyncio
-    @patch("api.routes.submissions.get_current_user")
-    @patch("api.routes.submissions.get_zerodb_client")
-    @patch("services.submission_service.get_submission")
-    async def test_get_submission_not_found(
-        self, mock_get, mock_get_client, mock_get_user, mock_user
+    @patch("api.routes.submissions.get_submission")
+    def test_get_submission_not_found(
+        self, mock_get, auth_client, mock_user
     ):
         """Should return 404 when submission doesn't exist"""
         # Arrange
-        mock_get_user.return_value = mock_user
         from fastapi import HTTPException
 
         mock_get.side_effect = HTTPException(
@@ -331,10 +291,7 @@ class TestGetSubmission:
         submission_id = str(uuid.uuid4())
 
         # Act
-        from main import app
-
-        client = TestClient(app)
-        response = client.get(
+        response = auth_client.get(
             f"/v1/submissions/{submission_id}",
             headers={"Authorization": "Bearer test-token"},
         )
@@ -342,14 +299,10 @@ class TestGetSubmission:
         # Assert
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
-    @pytest.mark.asyncio
-    async def test_get_submission_invalid_uuid(self):
+    def test_get_submission_invalid_uuid(self, auth_client):
         """Should return 422 for invalid UUID format"""
         # Act
-        from main import app
-
-        client = TestClient(app)
-        response = client.get(
+        response = auth_client.get(
             "/v1/submissions/invalid-uuid",
             headers={"Authorization": "Bearer test-token"},
         )
@@ -361,16 +314,12 @@ class TestGetSubmission:
 class TestUpdateSubmission:
     """Test PUT /v1/submissions/{id} endpoint"""
 
-    @pytest.mark.asyncio
-    @patch("api.routes.submissions.get_current_user")
-    @patch("api.routes.submissions.get_zerodb_client")
-    @patch("services.submission_service.update_submission")
-    async def test_update_submission_success(
-        self, mock_update, mock_get_client, mock_get_user, mock_user, mock_submission_data
+    @patch("api.routes.submissions.update_submission")
+    def test_update_submission_success(
+        self, mock_update, auth_client, mock_user, mock_submission_data
     ):
         """Should update submission and return 200"""
         # Arrange
-        mock_get_user.return_value = mock_user
         updated_data = mock_submission_data.copy()
         updated_data["project_name"] = "Updated Project Name"
         updated_data["status"] = "SUBMITTED"
@@ -383,10 +332,7 @@ class TestUpdateSubmission:
         }
 
         # Act
-        from main import app
-
-        client = TestClient(app)
-        response = client.put(
+        response = auth_client.put(
             f"/v1/submissions/{submission_id}",
             json=update_request,
             headers={"Authorization": "Bearer test-token"},
@@ -398,16 +344,12 @@ class TestUpdateSubmission:
         assert data["project_name"] == "Updated Project Name"
         assert data["status"] == "SUBMITTED"
 
-    @pytest.mark.asyncio
-    @patch("api.routes.submissions.get_current_user")
-    @patch("api.routes.submissions.get_zerodb_client")
-    @patch("services.submission_service.update_submission")
-    async def test_update_submission_partial(
-        self, mock_update, mock_get_client, mock_get_user, mock_user, mock_submission_data
+    @patch("api.routes.submissions.update_submission")
+    def test_update_submission_partial(
+        self, mock_update, auth_client, mock_user, mock_submission_data
     ):
         """Should allow partial updates"""
         # Arrange
-        mock_get_user.return_value = mock_user
         updated_data = mock_submission_data.copy()
         updated_data["description"] = "New description"
         mock_update.return_value = updated_data
@@ -416,10 +358,7 @@ class TestUpdateSubmission:
         update_request = {"description": "New description"}
 
         # Act
-        from main import app
-
-        client = TestClient(app)
-        response = client.put(
+        response = auth_client.put(
             f"/v1/submissions/{submission_id}",
             json=update_request,
             headers={"Authorization": "Bearer test-token"},
@@ -428,16 +367,12 @@ class TestUpdateSubmission:
         # Assert
         assert response.status_code == status.HTTP_200_OK
 
-    @pytest.mark.asyncio
-    @patch("api.routes.submissions.get_current_user")
-    @patch("api.routes.submissions.get_zerodb_client")
-    @patch("services.submission_service.update_submission")
-    async def test_update_submission_not_found(
-        self, mock_update, mock_get_client, mock_get_user, mock_user
+    @patch("api.routes.submissions.update_submission")
+    def test_update_submission_not_found(
+        self, mock_update, auth_client, mock_user
     ):
         """Should return 404 when submission doesn't exist"""
         # Arrange
-        mock_get_user.return_value = mock_user
         from fastapi import HTTPException
 
         mock_update.side_effect = HTTPException(
@@ -446,10 +381,7 @@ class TestUpdateSubmission:
         submission_id = str(uuid.uuid4())
 
         # Act
-        from main import app
-
-        client = TestClient(app)
-        response = client.put(
+        response = auth_client.put(
             f"/v1/submissions/{submission_id}",
             json={"project_name": "Updated Name"},
             headers={"Authorization": "Bearer test-token"},
@@ -458,19 +390,13 @@ class TestUpdateSubmission:
         # Assert
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
-    @pytest.mark.asyncio
-    @patch("api.routes.submissions.get_current_user")
-    async def test_update_submission_invalid_status(self, mock_get_user, mock_user):
-        """Should return 400 for invalid status value"""
+    def test_update_submission_invalid_status(self, auth_client, mock_user):
+        """Should return 422 for invalid status value"""
         # Arrange
-        mock_get_user.return_value = mock_user
         submission_id = str(uuid.uuid4())
 
         # Act
-        from main import app
-
-        client = TestClient(app)
-        response = client.put(
+        response = auth_client.put(
             f"/v1/submissions/{submission_id}",
             json={"status": "INVALID_STATUS"},
             headers={"Authorization": "Bearer test-token"},
@@ -483,24 +409,17 @@ class TestUpdateSubmission:
 class TestDeleteSubmission:
     """Test DELETE /v1/submissions/{id} endpoint"""
 
-    @pytest.mark.asyncio
-    @patch("api.routes.submissions.get_current_user")
-    @patch("api.routes.submissions.get_zerodb_client")
-    @patch("services.submission_service.delete_submission")
-    async def test_delete_submission_success(
-        self, mock_delete, mock_get_client, mock_get_user, mock_user
+    @patch("api.routes.submissions.delete_submission")
+    def test_delete_submission_success(
+        self, mock_delete, auth_client, mock_user
     ):
         """Should delete submission and return 204"""
         # Arrange
-        mock_get_user.return_value = mock_user
         mock_delete.return_value = {"success": True}
         submission_id = str(uuid.uuid4())
 
         # Act
-        from main import app
-
-        client = TestClient(app)
-        response = client.delete(
+        response = auth_client.delete(
             f"/v1/submissions/{submission_id}",
             headers={"Authorization": "Bearer test-token"},
         )
@@ -508,16 +427,12 @@ class TestDeleteSubmission:
         # Assert
         assert response.status_code == status.HTTP_204_NO_CONTENT
 
-    @pytest.mark.asyncio
-    @patch("api.routes.submissions.get_current_user")
-    @patch("api.routes.submissions.get_zerodb_client")
-    @patch("services.submission_service.delete_submission")
-    async def test_delete_submission_not_found(
-        self, mock_delete, mock_get_client, mock_get_user, mock_user
+    @patch("api.routes.submissions.delete_submission")
+    def test_delete_submission_not_found(
+        self, mock_delete, auth_client, mock_user
     ):
         """Should return 404 when submission doesn't exist"""
         # Arrange
-        mock_get_user.return_value = mock_user
         from fastapi import HTTPException
 
         mock_delete.side_effect = HTTPException(
@@ -526,10 +441,7 @@ class TestDeleteSubmission:
         submission_id = str(uuid.uuid4())
 
         # Act
-        from main import app
-
-        client = TestClient(app)
-        response = client.delete(
+        response = auth_client.delete(
             f"/v1/submissions/{submission_id}",
             headers={"Authorization": "Bearer test-token"},
         )
@@ -537,16 +449,12 @@ class TestDeleteSubmission:
         # Assert
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
-    @pytest.mark.asyncio
-    @patch("api.routes.submissions.get_current_user")
-    @patch("api.routes.submissions.get_zerodb_client")
-    @patch("services.submission_service.delete_submission")
-    async def test_delete_submission_already_scored(
-        self, mock_delete, mock_get_client, mock_get_user, mock_user
+    @patch("api.routes.submissions.delete_submission")
+    def test_delete_submission_already_scored(
+        self, mock_delete, auth_client, mock_user
     ):
         """Should return 400 when trying to delete SCORED submission"""
         # Arrange
-        mock_get_user.return_value = mock_user
         from fastapi import HTTPException
 
         mock_delete.side_effect = HTTPException(
@@ -556,10 +464,7 @@ class TestDeleteSubmission:
         submission_id = str(uuid.uuid4())
 
         # Act
-        from main import app
-
-        client = TestClient(app)
-        response = client.delete(
+        response = auth_client.delete(
             f"/v1/submissions/{submission_id}",
             headers={"Authorization": "Bearer test-token"},
         )
@@ -571,16 +476,12 @@ class TestDeleteSubmission:
 class TestFileUpload:
     """Test POST /v1/submissions/{id}/files endpoint"""
 
-    @pytest.mark.asyncio
-    @patch("api.routes.submissions.get_current_user")
-    @patch("api.routes.submissions.get_zerodb_client")
-    @patch("services.submission_service.upload_file_to_submission")
-    async def test_upload_file_success(
-        self, mock_upload, mock_get_client, mock_get_user, mock_user
+    @patch("api.routes.submissions.upload_file_to_submission")
+    def test_upload_file_success(
+        self, mock_upload, auth_client, mock_user
     ):
         """Should upload file and return 201"""
         # Arrange
-        mock_get_user.return_value = mock_user
         file_metadata = {
             "file_id": str(uuid.uuid4()),
             "file_name": "presentation.pdf",
@@ -600,10 +501,7 @@ class TestFileUpload:
         }
 
         # Act
-        from main import app
-
-        client = TestClient(app)
-        response = client.post(
+        response = auth_client.post(
             f"/v1/submissions/{submission_id}/files",
             json=file_request,
             headers={"Authorization": "Bearer test-token"},
@@ -615,16 +513,12 @@ class TestFileUpload:
         assert data["file_name"] == "presentation.pdf"
         assert data["file_type"] == "application/pdf"
 
-    @pytest.mark.asyncio
-    @patch("api.routes.submissions.get_current_user")
-    @patch("api.routes.submissions.get_zerodb_client")
-    @patch("services.submission_service.upload_file_to_submission")
-    async def test_upload_file_submission_not_found(
-        self, mock_upload, mock_get_client, mock_get_user, mock_user
+    @patch("api.routes.submissions.upload_file_to_submission")
+    def test_upload_file_submission_not_found(
+        self, mock_upload, auth_client, mock_user
     ):
         """Should return 404 when submission doesn't exist"""
         # Arrange
-        mock_get_user.return_value = mock_user
         from fastapi import HTTPException
 
         mock_upload.side_effect = HTTPException(
@@ -640,10 +534,7 @@ class TestFileUpload:
         }
 
         # Act
-        from main import app
-
-        client = TestClient(app)
-        response = client.post(
+        response = auth_client.post(
             f"/v1/submissions/{submission_id}/files",
             json=file_request,
             headers={"Authorization": "Bearer test-token"},
@@ -652,12 +543,9 @@ class TestFileUpload:
         # Assert
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
-    @pytest.mark.asyncio
-    @patch("api.routes.submissions.get_current_user")
-    async def test_upload_file_too_large(self, mock_get_user, mock_user):
+    def test_upload_file_too_large(self, auth_client, mock_user):
         """Should return 422 for files exceeding 100MB"""
         # Arrange
-        mock_get_user.return_value = mock_user
         submission_id = str(uuid.uuid4())
 
         file_request = {
@@ -668,10 +556,7 @@ class TestFileUpload:
         }
 
         # Act
-        from main import app
-
-        client = TestClient(app)
-        response = client.post(
+        response = auth_client.post(
             f"/v1/submissions/{submission_id}/files",
             json=file_request,
             headers={"Authorization": "Bearer test-token"},
@@ -680,12 +565,9 @@ class TestFileUpload:
         # Assert
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
-    @pytest.mark.asyncio
-    @patch("api.routes.submissions.get_current_user")
-    async def test_upload_file_invalid_mime_type(self, mock_get_user, mock_user):
+    def test_upload_file_invalid_mime_type(self, auth_client, mock_user):
         """Should return 422 for invalid MIME type format"""
         # Arrange
-        mock_get_user.return_value = mock_user
         submission_id = str(uuid.uuid4())
 
         file_request = {
@@ -696,10 +578,7 @@ class TestFileUpload:
         }
 
         # Act
-        from main import app
-
-        client = TestClient(app)
-        response = client.post(
+        response = auth_client.post(
             f"/v1/submissions/{submission_id}/files",
             json=file_request,
             headers={"Authorization": "Bearer test-token"},

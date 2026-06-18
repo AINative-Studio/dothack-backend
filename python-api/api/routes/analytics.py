@@ -12,7 +12,7 @@ from api.dependencies import get_current_user
 from config import settings
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from integrations.zerodb.client import ZeroDBClient
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from services import analytics_service
 from services.authorization import check_organizer
 
@@ -94,30 +94,29 @@ class HackathonStatsResponse(BaseModel):
     )
     calculated_at: str = Field(..., description="ISO 8601 timestamp of calculation")
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "hackathon_id": "550e8400-e29b-41d4-a716-446655440000",
-                "total_participants": 42,
-                "participants_by_role": {
-                    "organizer": 2,
-                    "judge": 5,
-                    "builder": 35,
-                },
-                "total_teams": 8,
-                "total_submissions": 8,
-                "submissions_by_status": {
-                    "DRAFT": 2,
-                    "SUBMITTED": 3,
-                    "SCORED": 3,
-                },
-                "average_scores": {
-                    "general": 85.5,
-                    "ai": 92.3,
-                },
-                "calculated_at": "2025-12-28T10:30:00Z",
-            }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "hackathon_id": "550e8400-e29b-41d4-a716-446655440000",
+            "total_participants": 42,
+            "participants_by_role": {
+                "organizer": 2,
+                "judge": 5,
+                "builder": 35,
+            },
+            "total_teams": 8,
+            "total_submissions": 8,
+            "submissions_by_status": {
+                "DRAFT": 2,
+                "SUBMITTED": 3,
+                "SCORED": 3,
+            },
+            "average_scores": {
+                "general": 85.5,
+                "ai": 92.3,
+            },
+            "calculated_at": "2025-12-28T10:30:00Z",
         }
+    })
 
 
 class ExportMetadata(BaseModel):
@@ -134,44 +133,43 @@ class HackathonExportResponse(BaseModel):
     format: str = Field(..., description="Export format")
     data: Dict[str, Any] = Field(..., description="Exported data")
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "format": "json",
-                "data": {
-                    "hackathon": {
-                        "hackathon_id": "550e8400-e29b-41d4-a716-446655440000",
-                        "name": "AI Hackathon 2025",
-                        "status": "completed",
-                    },
-                    "participants": [
-                        {
-                            "participant_id": "part-123",
-                            "user_id": "user-456",
-                            "role": "builder",
-                        }
-                    ],
-                    "teams": [{"team_id": "team-789", "name": "Team Awesome"}],
-                    "submissions": [
-                        {
-                            "submission_id": "sub-abc",
-                            "project_name": "Cool Project",
-                        }
-                    ],
-                    "scores": [{"score_id": "score-xyz", "total_score": 95.0}],
-                    "export_metadata": {
-                        "exported_at": "2025-12-28T10:30:00Z",
-                        "format": "json",
-                        "record_counts": {
-                            "participants": 42,
-                            "teams": 8,
-                            "submissions": 8,
-                            "scores": 40,
-                        },
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "format": "json",
+            "data": {
+                "hackathon": {
+                    "hackathon_id": "550e8400-e29b-41d4-a716-446655440000",
+                    "name": "AI Hackathon 2025",
+                    "status": "completed",
+                },
+                "participants": [
+                    {
+                        "participant_id": "part-123",
+                        "user_id": "user-456",
+                        "role": "builder",
+                    }
+                ],
+                "teams": [{"team_id": "team-789", "name": "Team Awesome"}],
+                "submissions": [
+                    {
+                        "submission_id": "sub-abc",
+                        "project_name": "Cool Project",
+                    }
+                ],
+                "scores": [{"score_id": "score-xyz", "total_score": 95.0}],
+                "export_metadata": {
+                    "exported_at": "2025-12-28T10:30:00Z",
+                    "format": "json",
+                    "record_counts": {
+                        "participants": 42,
+                        "teams": 8,
+                        "submissions": 8,
+                        "scores": 40,
                     },
                 },
-            }
+            },
         }
+    })
 
 
 @router.get(

@@ -9,7 +9,8 @@ import logging
 import time
 from typing import Any, Optional
 
-from fastapi import HTTPException, status
+from fastapi import HTTPException
+from starlette import status as http_status
 from integrations.zerodb.client import ZeroDBClient
 from integrations.zerodb.exceptions import ZeroDBError, ZeroDBTimeoutError
 
@@ -115,13 +116,13 @@ class SearchService:
         except ZeroDBTimeoutError as e:
             logger.error(f"Search timeout: {e}")
             raise HTTPException(
-                status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+                status_code=http_status.HTTP_504_GATEWAY_TIMEOUT,
                 detail="Search request timed out. Please try again.",
             )
         except ZeroDBError as e:
             logger.error(f"Search failed: {e}")
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to execute search. Please try again.",
             )
 
@@ -179,7 +180,7 @@ class SearchService:
 
             if not hackathon_rows:
                 raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
+                    status_code=http_status.HTTP_404_NOT_FOUND,
                     detail=f"Hackathon {hackathon_id} not found",
                 )
 
@@ -249,12 +250,12 @@ class SearchService:
         except ZeroDBTimeoutError as e:
             logger.error(f"Search timeout: hackathon={hackathon_id}, error={e}")
             raise HTTPException(
-                status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+                status_code=http_status.HTTP_504_GATEWAY_TIMEOUT,
                 detail="Search request timed out. Please try again.",
             )
         except ZeroDBError as e:
             logger.error(f"Search failed: hackathon={hackathon_id}, error={e}")
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to execute search. Please try again.",
             )

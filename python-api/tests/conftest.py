@@ -20,6 +20,41 @@ def client():
 
 
 @pytest.fixture
+def mock_user():
+    """Default mock authenticated user for testing."""
+    return {
+        "id": "test-user-id",
+        "email": "test@example.com",
+        "name": "Test User",
+        "role": "ADMIN",
+        "email_verified": True,
+    }
+
+
+@pytest.fixture
+def authenticated_client(mock_user):
+    """
+    Create a test client with get_current_user dependency overridden.
+
+    Uses FastAPI's dependency_overrides to properly bypass authentication.
+    This is the correct way to mock auth in FastAPI - patching the module
+    attribute does NOT work because Depends() captures the function object
+    at route definition time.
+    """
+    from main import app
+    from api.dependencies import get_current_user
+
+    async def override_get_current_user():
+        return mock_user
+
+    app.dependency_overrides[get_current_user] = override_get_current_user
+
+    yield TestClient(app)
+
+    app.dependency_overrides.pop(get_current_user, None)
+
+
+@pytest.fixture
 def mock_env(monkeypatch):
     """
     Set up mock environment variables for testing.

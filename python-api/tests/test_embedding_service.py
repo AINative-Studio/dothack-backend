@@ -36,12 +36,9 @@ class TestGenerateSubmissionEmbedding:
         submission_id = str(uuid.uuid4())
         hackathon_id = str(uuid.uuid4())
 
-        # Mock embedding generation
-        mock_client.embeddings.generate.return_value = {
-            "embedding": [0.1] * 384,  # 384 dimensions
-            "model": "BAAI/bge-small-en-v1.5",
-            "dimensions": 384,
-        }
+        # Mock embedding generation - service calls embeddings.generate(texts=[...])
+        # and expects a list of vectors back
+        mock_client.embeddings.generate.return_value = [[0.1] * 384]
 
         # Mock vector upsert
         mock_client.vectors.upsert.return_value = {
@@ -70,8 +67,9 @@ class TestGenerateSubmissionEmbedding:
         # Verify embedding generation was called
         mock_client.embeddings.generate.assert_called_once()
         call_args = mock_client.embeddings.generate.call_args
-        assert "AI Code Assistant" in call_args.kwargs["text"]
-        assert "intelligent coding assistant" in call_args.kwargs["text"]
+        texts = call_args.kwargs["texts"]
+        assert "AI Code Assistant" in texts[0]
+        assert "intelligent coding assistant" in texts[0]
 
         # Verify vector upsert was called
         mock_client.vectors.upsert.assert_called_once()
@@ -97,11 +95,7 @@ class TestGenerateSubmissionEmbedding:
         submission_id = str(uuid.uuid4())
         hackathon_id = str(uuid.uuid4())
 
-        mock_client.embeddings.generate.return_value = {
-            "embedding": [0.1] * 384,
-            "model": "BAAI/bge-small-en-v1.5",
-            "dimensions": 384,
-        }
+        mock_client.embeddings.generate.return_value = [[0.1] * 384]
         mock_client.vectors.upsert.return_value = {"vector_id": submission_id}
 
         # Act
@@ -116,7 +110,7 @@ class TestGenerateSubmissionEmbedding:
 
         # Assert
         call_args = mock_client.embeddings.generate.call_args
-        combined_text = call_args.kwargs["text"]
+        combined_text = call_args.kwargs["texts"][0]
         assert "Test Project" in combined_text
         assert "Test description" in combined_text
         assert "Built with Python" in combined_text
@@ -188,10 +182,7 @@ class TestGenerateSubmissionEmbedding:
         """Should raise HTTPException on database error"""
         # Arrange
         mock_client = AsyncMock()
-        mock_client.embeddings.generate.return_value = {
-            "embedding": [0.1] * 384,
-            "model": "BAAI/bge-small-en-v1.5",
-        }
+        mock_client.embeddings.generate.return_value = [[0.1] * 384]
         mock_client.vectors.upsert.side_effect = ZeroDBError("Database connection failed")
 
         # Act & Assert
@@ -211,10 +202,7 @@ class TestGenerateSubmissionEmbedding:
         """Should raise HTTPException if embedding API returns no vector"""
         # Arrange
         mock_client = AsyncMock()
-        mock_client.embeddings.generate.return_value = {
-            "model": "BAAI/bge-small-en-v1.5",
-            # Missing 'embedding' key
-        }
+        mock_client.embeddings.generate.return_value = []  # Empty list
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
@@ -240,11 +228,7 @@ class TestUpdateSubmissionEmbedding:
         mock_client = AsyncMock()
         submission_id = str(uuid.uuid4())
 
-        mock_client.embeddings.generate.return_value = {
-            "embedding": [0.2] * 384,  # Different values
-            "model": "BAAI/bge-small-en-v1.5",
-            "dimensions": 384,
-        }
+        mock_client.embeddings.generate.return_value = [[0.2] * 384]
         mock_client.vectors.upsert.return_value = {"vector_id": submission_id}
 
         # Act
@@ -273,10 +257,7 @@ class TestUpdateSubmissionEmbedding:
         # Arrange
         mock_client = AsyncMock()
 
-        mock_client.embeddings.generate.return_value = {
-            "embedding": [0.3] * 384,
-            "model": "BAAI/bge-small-en-v1.5",
-        }
+        mock_client.embeddings.generate.return_value = [[0.3] * 384]
         mock_client.vectors.upsert.return_value = {"vector_id": "sub-123"}
 
         # Act
@@ -290,7 +271,7 @@ class TestUpdateSubmissionEmbedding:
 
         # Assert
         call_args = mock_client.embeddings.generate.call_args
-        text = call_args.kwargs["text"]
+        text = call_args.kwargs["texts"][0]
         assert "Completely New Title" in text
         assert "different description" in text
 
@@ -389,11 +370,8 @@ class TestSearchSimilarSubmissions:
         mock_client = AsyncMock()
         hackathon_id = str(uuid.uuid4())
 
-        # Mock embedding generation for query
-        mock_client.embeddings.generate.return_value = {
-            "embedding": [0.5] * 384,
-            "model": "BAAI/bge-small-en-v1.5",
-        }
+        # Mock embedding generation for query - returns list of vectors
+        mock_client.embeddings.generate.return_value = [[0.5] * 384]
 
         # Mock vector search results
         mock_client.vectors.search.return_value = [
@@ -442,7 +420,7 @@ class TestSearchSimilarSubmissions:
 
         # Verify query embedding was generated
         mock_client.embeddings.generate.assert_called_once_with(
-            text="AI coding tool", model="BAAI/bge-small-en-v1.5"
+            texts=["AI coding tool"]
         )
 
         # Verify search was called with correct parameters
@@ -458,7 +436,7 @@ class TestSearchSimilarSubmissions:
         """Should search without filters if not provided"""
         # Arrange
         mock_client = AsyncMock()
-        mock_client.embeddings.generate.return_value = {"embedding": [0.5] * 384}
+        mock_client.embeddings.generate.return_value = [[0.5] * 384]
         mock_client.vectors.search.return_value = []
 
         # Act
@@ -535,13 +513,8 @@ class TestBatchGenerateEmbeddings:
             },
         ]
 
-        # Mock batch embedding generation
-        mock_client.embeddings.batch_generate.return_value = {
-            "embeddings": [[0.1] * 384, [0.2] * 384],
-            "model": "BAAI/bge-small-en-v1.5",
-            "dimensions": 384,
-            "count": 2,
-        }
+        # Mock batch embedding generation - returns list of embedding vectors
+        mock_client.embeddings.generate.return_value = [[0.1] * 384, [0.2] * 384]
 
         # Mock batch upsert
         mock_client.vectors.batch_upsert.return_value = {"success": True}
@@ -560,7 +533,7 @@ class TestBatchGenerateEmbeddings:
         assert result["namespace"] == f"hackathons/{hackathon_id}/submissions"
 
         # Verify batch embedding was called with correct texts
-        batch_args = mock_client.embeddings.batch_generate.call_args
+        batch_args = mock_client.embeddings.generate.call_args
         texts = batch_args.kwargs["texts"]
         assert len(texts) == 2
         assert "Project 1" in texts[0]
@@ -590,10 +563,7 @@ class TestBatchGenerateEmbeddings:
             }
         ]
 
-        mock_client.embeddings.batch_generate.return_value = {
-            "embeddings": [[0.1] * 384],
-            "count": 1,
-        }
+        mock_client.embeddings.generate.return_value = [[0.1] * 384]
         mock_client.vectors.batch_upsert.return_value = {"success": True}
 
         # Act
@@ -604,7 +574,7 @@ class TestBatchGenerateEmbeddings:
         )
 
         # Assert
-        batch_args = mock_client.embeddings.batch_generate.call_args
+        batch_args = mock_client.embeddings.generate.call_args
         text = batch_args.kwargs["texts"][0]
         assert "Built with Python" in text
 
@@ -628,10 +598,7 @@ class TestBatchGenerateEmbeddings:
         ]
 
         # Return wrong number of embeddings
-        mock_client.embeddings.batch_generate.return_value = {
-            "embeddings": [[0.1] * 384],  # Only 1 embedding for 2 submissions
-            "count": 1,
-        }
+        mock_client.embeddings.generate.return_value = [[0.1] * 384]  # Only 1 for 2 submissions
 
         # Act & Assert
         with pytest.raises(HTTPException):
@@ -646,7 +613,7 @@ class TestBatchGenerateEmbeddings:
         """Should raise HTTPException on timeout"""
         # Arrange
         mock_client = AsyncMock()
-        mock_client.embeddings.batch_generate.side_effect = ZeroDBTimeoutError("Timeout")
+        mock_client.embeddings.generate.side_effect = ZeroDBTimeoutError("Timeout")
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:

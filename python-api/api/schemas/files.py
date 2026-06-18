@@ -9,7 +9,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class FileType(str, Enum):
@@ -51,20 +51,18 @@ class FileUploadResponse(BaseModel):
     created_at: str = Field(..., description="Upload timestamp (ISO 8601)")
     url: Optional[str] = Field(None, description="Public download URL (if available)")
 
-    class Config:
-        from_attributes = True
-        json_schema_extra = {
-            "example": {
-                "file_id": "file_abc123xyz",
-                "file_name": "team_logo.png",
-                "content_type": "image/png",
-                "size": 245678,
-                "folder": "teams/team-123/logos",
-                "metadata": {"team_id": "team-123", "file_type": "team_logo"},
-                "created_at": "2024-12-28T10:30:00Z",
-                "url": None,
-            }
+    model_config = ConfigDict(from_attributes=True, json_schema_extra={
+        "example": {
+            "file_id": "file_abc123xyz",
+            "file_name": "team_logo.png",
+            "content_type": "image/png",
+            "size": 245678,
+            "folder": "teams/team-123/logos",
+            "metadata": {"team_id": "team-123", "file_type": "team_logo"},
+            "created_at": "2024-12-28T10:30:00Z",
+            "url": None,
         }
+    })
 
 
 class PresignedURLResponse(BaseModel):
@@ -81,15 +79,13 @@ class PresignedURLResponse(BaseModel):
     expires_at: str = Field(..., description="URL expiration timestamp (ISO 8601)")
     file_id: str = Field(..., description="File identifier")
 
-    class Config:
-        from_attributes = True
-        json_schema_extra = {
-            "example": {
-                "url": "https://storage.example.com/files/abc123?signature=xyz...",
-                "expires_at": "2024-12-28T11:30:00Z",
-                "file_id": "file_abc123xyz",
-            }
+    model_config = ConfigDict(from_attributes=True, json_schema_extra={
+        "example": {
+            "url": "https://storage.example.com/files/abc123?signature=xyz...",
+            "expires_at": "2024-12-28T11:30:00Z",
+            "file_id": "file_abc123xyz",
         }
+    })
 
 
 class FileMetadataResponse(BaseModel):
@@ -114,8 +110,7 @@ class FileMetadataResponse(BaseModel):
     metadata: Optional[Dict[str, Any]] = Field(None, description="Custom metadata")
     created_at: str = Field(..., description="Upload timestamp (ISO 8601)")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class FileListItem(BaseModel):
@@ -155,25 +150,23 @@ class FileListResponse(BaseModel):
     limit: int = Field(..., description="Items per page")
     offset: int = Field(..., description="Current offset")
 
-    class Config:
-        from_attributes = True
-        json_schema_extra = {
-            "example": {
-                "files": [
-                    {
-                        "file_id": "file_abc123",
-                        "file_name": "logo.png",
-                        "content_type": "image/png",
-                        "size": 245678,
-                        "folder": "teams/team-123/logos",
-                        "created_at": "2024-12-28T10:30:00Z",
-                    }
-                ],
-                "total": 1,
-                "limit": 100,
-                "offset": 0,
-            }
+    model_config = ConfigDict(from_attributes=True, json_schema_extra={
+        "example": {
+            "files": [
+                {
+                    "file_id": "file_abc123",
+                    "file_name": "logo.png",
+                    "content_type": "image/png",
+                    "size": 245678,
+                    "folder": "teams/team-123/logos",
+                    "created_at": "2024-12-28T10:30:00Z",
+                }
+            ],
+            "total": 1,
+            "limit": 100,
+            "offset": 0,
         }
+    })
 
 
 class FileDeleteResponse(BaseModel):
@@ -190,15 +183,13 @@ class FileDeleteResponse(BaseModel):
     file_id: str = Field(..., description="Deleted file identifier")
     message: str = Field(..., description="Confirmation message")
 
-    class Config:
-        from_attributes = True
-        json_schema_extra = {
-            "example": {
-                "success": True,
-                "file_id": "file_abc123xyz",
-                "message": "File deleted successfully",
-            }
+    model_config = ConfigDict(from_attributes=True, json_schema_extra={
+        "example": {
+            "success": True,
+            "file_id": "file_abc123xyz",
+            "message": "File deleted successfully",
         }
+    })
 
 
 class SubmissionFileUploadRequest(BaseModel):
@@ -211,8 +202,7 @@ class SubmissionFileUploadRequest(BaseModel):
 
     file_type: FileType = Field(..., description="Type of file (image, pdf, video)")
 
-    class Config:
-        json_schema_extra = {"example": {"file_type": "image"}}
+    model_config = ConfigDict(json_schema_extra={"example": {"file_type": "image"}})
 
 
 class ErrorResponse(BaseModel):
@@ -225,13 +215,12 @@ class ErrorResponse(BaseModel):
 
     error: Dict[str, Any] = Field(..., description="Error details")
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "error": {
-                    "status_code": 400,
-                    "message": "File size exceeds maximum allowed size of 10.0MB",
-                    "path": "/api/v1/teams/team-123/logo",
-                }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "error": {
+                "status_code": 400,
+                "message": "File size exceeds maximum allowed size of 10.0MB",
+                "path": "/api/v1/teams/team-123/logo",
             }
         }
+    })

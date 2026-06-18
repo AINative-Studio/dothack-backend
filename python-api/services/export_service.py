@@ -516,62 +516,62 @@ class ExportService:
     async def _get_hackathon(self, hackathon_id: str) -> Dict[str, Any]:
         """Fetch hackathon by ID."""
         filter_query = {"hackathon_id": hackathon_id, "deleted_at": None}
-        result = await self.zerodb.tables.query(
-            table_id="hackathons",
+        rows = await self.zerodb.tables.query_rows(
+            "hackathons",
             filter=filter_query,
             limit=1,
         )
 
-        if not result.get("rows"):
+        if not rows:
             raise ZeroDBNotFound(f"Hackathon {hackathon_id} not found")
 
-        return result["rows"][0]
+        return rows[0]
 
     async def _get_participants(self, hackathon_id: str) -> List[Dict[str, Any]]:
         """Fetch all participants for a hackathon."""
         try:
-            result = await self.zerodb.tables.query(
-                table_id="hackathon_participants",
+            rows = await self.zerodb.tables.query_rows(
+                "hackathon_participants",
                 filter={"hackathon_id": hackathon_id, "deleted_at": None},
                 limit=10000,
             )
-            return result.get("rows", [])
+            return rows
         except (ZeroDBError, ZeroDBNotFound):
             return []
 
     async def _get_submissions(self, hackathon_id: str) -> List[Dict[str, Any]]:
         """Fetch all submissions for a hackathon."""
         try:
-            result = await self.zerodb.tables.query(
-                table_id="submissions",
+            rows = await self.zerodb.tables.query_rows(
+                "submissions",
                 filter={"hackathon_id": hackathon_id, "deleted_at": None},
                 limit=10000,
             )
-            return result.get("rows", [])
+            return rows
         except (ZeroDBError, ZeroDBNotFound):
             return []
 
     async def _get_teams(self, hackathon_id: str) -> List[Dict[str, Any]]:
         """Fetch all teams for a hackathon."""
         try:
-            result = await self.zerodb.tables.query(
-                table_id="teams",
+            rows = await self.zerodb.tables.query_rows(
+                "teams",
                 filter={"hackathon_id": hackathon_id, "deleted_at": None},
                 limit=10000,
             )
-            return result.get("rows", [])
+            return rows
         except (ZeroDBError, ZeroDBNotFound):
             return []
 
     async def _get_judgments(self, hackathon_id: str) -> List[Dict[str, Any]]:
         """Fetch all judgments for a hackathon."""
         try:
-            result = await self.zerodb.tables.query(
-                table_id="judgments",
+            rows = await self.zerodb.tables.query_rows(
+                "judgments",
                 filter={"hackathon_id": hackathon_id, "deleted_at": None},
                 limit=10000,
             )
-            return result.get("rows", [])
+            return rows
         except (ZeroDBError, ZeroDBNotFound):
             return []
 
@@ -624,7 +624,7 @@ class ExportService:
         try:
             # Soft delete hackathon and related data
             await self.zerodb.tables.update(
-                table_id="hackathons",
+                "hackathons",
                 filter={"hackathon_id": hackathon_id},
                 update={"deleted_at": datetime.utcnow().isoformat()},
             )
@@ -632,7 +632,7 @@ class ExportService:
             # Delete related data
             for table in ["hackathon_participants", "submissions", "teams", "judgments"]:
                 await self.zerodb.tables.update(
-                    table_id=table,
+                    table,
                     filter={"hackathon_id": hackathon_id},
                     update={"deleted_at": datetime.utcnow().isoformat()},
                 )

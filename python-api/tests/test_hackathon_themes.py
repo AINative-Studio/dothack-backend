@@ -51,7 +51,7 @@ def sample_theme_data(sample_theme_id):
 @pytest.mark.asyncio
 async def test_get_theme_by_name_found(mock_zerodb, sample_theme_data):
     """Test finding theme by name."""
-    mock_zerodb.tables.query_rows.return_value = {"rows": [sample_theme_data]}
+    mock_zerodb.tables.query_rows.return_value = [sample_theme_data]
 
     result = await hackathon_theme_service.get_theme_by_name(
         "AI & Machine Learning", mock_zerodb
@@ -63,7 +63,7 @@ async def test_get_theme_by_name_found(mock_zerodb, sample_theme_data):
 @pytest.mark.asyncio
 async def test_get_theme_by_name_not_found(mock_zerodb):
     """Test theme not found by name."""
-    mock_zerodb.tables.query_rows.return_value = {"rows": []}
+    mock_zerodb.tables.query_rows.return_value = []
 
     result = await hackathon_theme_service.get_theme_by_name("Nonexistent", mock_zerodb)
 
@@ -73,7 +73,7 @@ async def test_get_theme_by_name_not_found(mock_zerodb):
 @pytest.mark.asyncio
 async def test_get_theme_by_name_exclude(mock_zerodb, sample_theme_id, sample_theme_data):
     """Test excluding specific theme from name check."""
-    mock_zerodb.tables.query_rows.return_value = {"rows": [sample_theme_data]}
+    mock_zerodb.tables.query_rows.return_value = [sample_theme_data]
 
     result = await hackathon_theme_service.get_theme_by_name(
         "AI & Machine Learning", mock_zerodb, exclude_id=sample_theme_id
@@ -87,7 +87,7 @@ async def test_get_theme_by_name_exclude(mock_zerodb, sample_theme_id, sample_th
 @pytest.mark.asyncio
 async def test_get_next_display_order_empty(mock_zerodb):
     """Test getting first display order when no themes exist."""
-    mock_zerodb.tables.query_rows.return_value = {"rows": []}
+    mock_zerodb.tables.query_rows.return_value = []
 
     order = await hackathon_theme_service.get_next_display_order(mock_zerodb)
 
@@ -97,13 +97,11 @@ async def test_get_next_display_order_empty(mock_zerodb):
 @pytest.mark.asyncio
 async def test_get_next_display_order_with_existing(mock_zerodb, sample_theme_data):
     """Test getting next display order with existing themes."""
-    mock_zerodb.tables.query_rows.return_value = {
-        "rows": [
-            {**sample_theme_data, "display_order": 1},
-            {**sample_theme_data, "display_order": 3},
-            {**sample_theme_data, "display_order": 2}
-        ]
-    }
+    mock_zerodb.tables.query_rows.return_value = [
+        {**sample_theme_data, "display_order": 1},
+        {**sample_theme_data, "display_order": 3},
+        {**sample_theme_data, "display_order": 2}
+    ]
 
     order = await hackathon_theme_service.get_next_display_order(mock_zerodb)
 
@@ -115,7 +113,7 @@ async def test_get_next_display_order_with_existing(mock_zerodb, sample_theme_da
 @pytest.mark.asyncio
 async def test_create_theme_success(mock_zerodb):
     """Test successful theme creation."""
-    mock_zerodb.tables.query_rows.return_value = {"rows": []}  # No duplicate
+    mock_zerodb.tables.query_rows.return_value = []  # No duplicate
     mock_zerodb.tables.insert_rows.return_value = None
 
     with patch('services.hackathon_theme_service.uuid4') as mock_uuid:
@@ -139,8 +137,8 @@ async def test_create_theme_success(mock_zerodb):
 async def test_create_theme_auto_display_order(mock_zerodb):
     """Test theme creation with auto-assigned display order."""
     mock_zerodb.tables.query_rows.side_effect = [
-        {"rows": []},  # No duplicate
-        {"rows": [{"display_order": 2}]}  # Existing themes for order calculation
+        [],  # No duplicate
+        [{"display_order": 2}]  # Existing themes for order calculation
     ]
     mock_zerodb.tables.insert_rows.return_value = None
 
@@ -160,7 +158,7 @@ async def test_create_theme_auto_display_order(mock_zerodb):
 @pytest.mark.asyncio
 async def test_create_theme_duplicate(mock_zerodb, sample_theme_data):
     """Test preventing duplicate theme creation."""
-    mock_zerodb.tables.query_rows.return_value = {"rows": [sample_theme_data]}
+    mock_zerodb.tables.query_rows.return_value = [sample_theme_data]
 
     with pytest.raises(HTTPException) as exc_info:
         await hackathon_theme_service.create_theme(
@@ -180,13 +178,13 @@ async def test_create_theme_duplicate(mock_zerodb, sample_theme_data):
 @pytest.mark.asyncio
 async def test_get_theme_success(mock_zerodb, sample_theme_id, sample_theme_data):
     """Test successful theme retrieval."""
-    mock_zerodb.tables.query_rows.return_value = {"rows": [sample_theme_data]}
+    mock_zerodb.tables.query_rows.return_value = [sample_theme_data]
 
     result = await hackathon_theme_service.get_theme(sample_theme_id, mock_zerodb)
 
     assert result == sample_theme_data
     mock_zerodb.tables.query_rows.assert_called_once_with(
-        table_id="hackathon_themes",
+        "hackathon_themes",
         filter={"id": sample_theme_id},
         limit=1
     )
@@ -195,7 +193,7 @@ async def test_get_theme_success(mock_zerodb, sample_theme_id, sample_theme_data
 @pytest.mark.asyncio
 async def test_get_theme_not_found(mock_zerodb, sample_theme_id):
     """Test theme not found."""
-    mock_zerodb.tables.query_rows.return_value = {"rows": []}
+    mock_zerodb.tables.query_rows.return_value = []
 
     with pytest.raises(HTTPException) as exc_info:
         await hackathon_theme_service.get_theme(sample_theme_id, mock_zerodb)
@@ -214,7 +212,7 @@ async def test_list_themes_success(mock_zerodb, sample_theme_data):
         {**sample_theme_data, "display_order": 1, "theme_name": "AI"},
         {**sample_theme_data, "display_order": 3, "theme_name": "IoT"}
     ]
-    mock_zerodb.tables.query_rows.return_value = {"rows": themes}
+    mock_zerodb.tables.query_rows.return_value = themes
 
     result = await hackathon_theme_service.list_themes(mock_zerodb)
 
@@ -229,7 +227,7 @@ async def test_list_themes_success(mock_zerodb, sample_theme_data):
 @pytest.mark.asyncio
 async def test_list_themes_empty(mock_zerodb):
     """Test listing when no themes exist."""
-    mock_zerodb.tables.query_rows.return_value = {"rows": []}
+    mock_zerodb.tables.query_rows.return_value = []
 
     result = await hackathon_theme_service.list_themes(mock_zerodb)
 
@@ -242,7 +240,7 @@ async def test_list_themes_empty(mock_zerodb):
 @pytest.mark.asyncio
 async def test_update_theme_success(mock_zerodb, sample_theme_id, sample_theme_data):
     """Test successful theme update."""
-    mock_zerodb.tables.query_rows.return_value = {"rows": [sample_theme_data]}
+    mock_zerodb.tables.query_rows.return_value = [sample_theme_data]
     mock_zerodb.tables.update_rows.return_value = None
 
     update_data = {"description": "Updated description", "icon": "🔥"}
@@ -260,8 +258,8 @@ async def test_update_theme_duplicate_name(mock_zerodb, sample_theme_id, sample_
     """Test preventing duplicate name on update."""
     other_theme = {**sample_theme_data, "id": str(uuid4())}
     mock_zerodb.tables.query_rows.side_effect = [
-        {"rows": [sample_theme_data]},  # Current theme
-        {"rows": [other_theme]}  # Duplicate name check
+        [sample_theme_data],  # Current theme
+        [other_theme]  # Duplicate name check
     ]
 
     with pytest.raises(HTTPException) as exc_info:
@@ -280,7 +278,7 @@ async def test_update_theme_duplicate_name(mock_zerodb, sample_theme_id, sample_
 @pytest.mark.asyncio
 async def test_update_theme_order(mock_zerodb, sample_theme_id, sample_theme_data):
     """Test updating theme display order."""
-    mock_zerodb.tables.query_rows.return_value = {"rows": [sample_theme_data]}
+    mock_zerodb.tables.query_rows.return_value = [sample_theme_data]
     mock_zerodb.tables.update_rows.return_value = None
 
     result = await hackathon_theme_service.update_theme_order(
@@ -295,7 +293,7 @@ async def test_update_theme_order(mock_zerodb, sample_theme_id, sample_theme_dat
 @pytest.mark.asyncio
 async def test_delete_theme_success(mock_zerodb, sample_theme_id, sample_theme_data):
     """Test successful theme deletion."""
-    mock_zerodb.tables.query_rows.return_value = {"rows": [sample_theme_data]}
+    mock_zerodb.tables.query_rows.return_value = [sample_theme_data]
     mock_zerodb.tables.delete_rows.return_value = None
 
     await hackathon_theme_service.delete_theme(sample_theme_id, mock_zerodb)
@@ -309,7 +307,7 @@ async def test_delete_theme_success(mock_zerodb, sample_theme_id, sample_theme_d
 @pytest.mark.asyncio
 async def test_delete_theme_not_found(mock_zerodb, sample_theme_id):
     """Test deleting non-existent theme."""
-    mock_zerodb.tables.query_rows.return_value = {"rows": []}
+    mock_zerodb.tables.query_rows.return_value = []
 
     with pytest.raises(HTTPException) as exc_info:
         await hackathon_theme_service.delete_theme(sample_theme_id, mock_zerodb)
@@ -324,14 +322,12 @@ async def test_refresh_theme_statistics(mock_zerodb, sample_theme_id, sample_the
     """Test refreshing theme statistics from hackathons."""
     # Mock theme query
     mock_zerodb.tables.query_rows.side_effect = [
-        {"rows": [sample_theme_data]},  # Get theme
-        {  # Get hackathons with this theme
-            "rows": [
-                {"theme_id": sample_theme_id, "total_prizes": 10000},
-                {"theme_id": sample_theme_id, "total_prizes": 15000},
-                {"theme_id": sample_theme_id, "total_prizes": 25000}
-            ]
-        }
+        [sample_theme_data],  # Get theme
+        [  # Get hackathons with this theme
+            {"theme_id": sample_theme_id, "total_prizes": 10000},
+            {"theme_id": sample_theme_id, "total_prizes": 15000},
+            {"theme_id": sample_theme_id, "total_prizes": 25000}
+        ]
     ]
     mock_zerodb.tables.update_rows.return_value = None
 
@@ -347,8 +343,8 @@ async def test_refresh_theme_statistics(mock_zerodb, sample_theme_id, sample_the
 async def test_refresh_theme_statistics_no_hackathons(mock_zerodb, sample_theme_id, sample_theme_data):
     """Test statistics refresh with no hackathons."""
     mock_zerodb.tables.query_rows.side_effect = [
-        {"rows": [sample_theme_data]},  # Get theme
-        {"rows": []}  # No hackathons
+        [sample_theme_data],  # Get theme
+        []  # No hackathons
     ]
     mock_zerodb.tables.update_rows.return_value = None
 
@@ -369,11 +365,11 @@ async def test_refresh_all_theme_statistics(mock_zerodb, sample_theme_data):
     theme2 = {**sample_theme_data, "id": str(uuid4()), "theme_name": "Web3"}
 
     mock_zerodb.tables.query_rows.side_effect = [
-        {"rows": [theme1, theme2]},  # List themes
-        {"rows": [theme1]},  # Get theme1
-        {"rows": [{"theme_id": theme1["id"], "total_prizes": 10000}]},  # Hackathons for theme1
-        {"rows": [theme2]},  # Get theme2
-        {"rows": [{"theme_id": theme2["id"], "total_prizes": 20000}]}  # Hackathons for theme2
+        [theme1, theme2],  # List themes
+        [theme1],  # Get theme1
+        [{"theme_id": theme1["id"], "total_prizes": 10000}],  # Hackathons for theme1
+        [theme2],  # Get theme2
+        [{"theme_id": theme2["id"], "total_prizes": 20000}]  # Hackathons for theme2
     ]
     mock_zerodb.tables.update_rows.return_value = None
 
@@ -388,8 +384,8 @@ async def test_refresh_all_theme_statistics(mock_zerodb, sample_theme_data):
 async def test_create_theme_minimal_data(mock_zerodb):
     """Test creating theme with only required fields."""
     mock_zerodb.tables.query_rows.side_effect = [
-        {"rows": []},  # No duplicate
-        {"rows": []}  # No existing themes
+        [],  # No duplicate
+        []  # No existing themes
     ]
     mock_zerodb.tables.insert_rows.return_value = None
 
@@ -412,7 +408,7 @@ async def test_create_theme_minimal_data(mock_zerodb):
 @pytest.mark.asyncio
 async def test_update_theme_partial(mock_zerodb, sample_theme_id, sample_theme_data):
     """Test partial theme update (only some fields)."""
-    mock_zerodb.tables.query_rows.return_value = {"rows": [sample_theme_data]}
+    mock_zerodb.tables.query_rows.return_value = [sample_theme_data]
     mock_zerodb.tables.update_rows.return_value = None
 
     update_data = {"icon": "🚀"}
@@ -432,7 +428,7 @@ async def test_list_themes_ordering(mock_zerodb, sample_theme_data):
         {**sample_theme_data, "display_order": 1, "theme_name": "First"},
         {**sample_theme_data, "display_order": 3, "theme_name": "Middle"}
     ]
-    mock_zerodb.tables.query_rows.return_value = {"rows": themes}
+    mock_zerodb.tables.query_rows.return_value = themes
 
     result = await hackathon_theme_service.list_themes(mock_zerodb)
 

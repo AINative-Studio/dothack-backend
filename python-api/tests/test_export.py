@@ -30,7 +30,7 @@ def mock_zerodb_client():
 
     # Mock tables interface
     mock_client.tables = MagicMock()
-    mock_client.tables.query = AsyncMock()
+    mock_client.tables.query_rows = AsyncMock()
     mock_client.tables.update = AsyncMock()
 
     # Mock files interface
@@ -155,12 +155,12 @@ async def test_export_hackathon_json_success(
 ):
     """Test successful JSON export with all data."""
     # Mock database queries
-    mock_zerodb_client.tables.query.side_effect = [
-        {"rows": [sample_hackathon]},  # Hackathon
-        {"rows": sample_participants},  # Participants
-        {"rows": sample_submissions},  # Submissions
-        {"rows": sample_teams},  # Teams
-        {"rows": []},  # Judgments
+    mock_zerodb_client.tables.query_rows.side_effect = [
+        [sample_hackathon],  # Hackathon
+        sample_participants,  # Participants
+        sample_submissions,  # Submissions
+        sample_teams,  # Teams
+        [],  # Judgments
     ]
 
     result = await export_service.export_hackathon_json(
@@ -187,7 +187,7 @@ async def test_export_hackathon_json_minimal(
     export_service, mock_zerodb_client, sample_hackathon
 ):
     """Test JSON export with minimal data (hackathon only)."""
-    mock_zerodb_client.tables.query.return_value = {"rows": [sample_hackathon]}
+    mock_zerodb_client.tables.query_rows.return_value = [sample_hackathon]
 
     result = await export_service.export_hackathon_json(
         "hack-123",
@@ -206,7 +206,7 @@ async def test_export_hackathon_json_minimal(
 @pytest.mark.asyncio
 async def test_export_hackathon_json_not_found(export_service, mock_zerodb_client):
     """Test JSON export for non-existent hackathon."""
-    mock_zerodb_client.tables.query.return_value = {"rows": []}
+    mock_zerodb_client.tables.query_rows.return_value = []
 
     with pytest.raises(HTTPException) as exc_info:
         await export_service.export_hackathon_json("nonexistent")
@@ -220,7 +220,7 @@ async def test_export_hackathon_json_database_error(
     export_service, mock_zerodb_client
 ):
     """Test JSON export with database error."""
-    mock_zerodb_client.tables.query.side_effect = ZeroDBError("Database error")
+    mock_zerodb_client.tables.query_rows.side_effect = ZeroDBError("Database error")
 
     with pytest.raises(HTTPException) as exc_info:
         await export_service.export_hackathon_json("hack-123")
@@ -240,11 +240,11 @@ async def test_export_hackathon_csv_success(
     sample_submissions,
 ):
     """Test successful CSV export."""
-    mock_zerodb_client.tables.query.side_effect = [
-        {"rows": [sample_hackathon]},
-        {"rows": sample_participants},
-        {"rows": sample_submissions},
-        {"rows": []},
+    mock_zerodb_client.tables.query_rows.side_effect = [
+        [sample_hackathon],
+        sample_participants,
+        sample_submissions,
+        [],
     ]
 
     result = await export_service.export_hackathon_csv(
@@ -267,11 +267,11 @@ async def test_export_hackathon_csv_empty_sections(
     export_service, mock_zerodb_client, sample_hackathon
 ):
     """Test CSV export with empty participants/submissions."""
-    mock_zerodb_client.tables.query.side_effect = [
-        {"rows": [sample_hackathon]},
-        {"rows": []},  # No participants
-        {"rows": []},  # No submissions
-        {"rows": []},  # No teams
+    mock_zerodb_client.tables.query_rows.side_effect = [
+        [sample_hackathon],
+        [],  # No participants
+        [],  # No submissions
+        [],  # No teams
     ]
 
     result = await export_service.export_hackathon_csv("hack-123")
@@ -288,12 +288,12 @@ async def test_generate_pdf_report_success(
     export_service, mock_zerodb_client, sample_hackathon, sample_participants
 ):
     """Test PDF report generation."""
-    mock_zerodb_client.tables.query.side_effect = [
-        {"rows": [sample_hackathon]},
-        {"rows": sample_participants},
-        {"rows": []},
-        {"rows": []},
-        {"rows": []},
+    mock_zerodb_client.tables.query_rows.side_effect = [
+        [sample_hackathon],
+        sample_participants,
+        [],
+        [],
+        [],
     ]
 
     result = await export_service.generate_pdf_report(
@@ -321,7 +321,7 @@ async def test_export_rlhf_data_json(
     sample_rlhf_interactions,
 ):
     """Test RLHF data export in JSON format."""
-    mock_zerodb_client.tables.query.return_value = {"rows": [sample_hackathon]}
+    mock_zerodb_client.tables.query_rows.return_value = [sample_hackathon]
     mock_zerodb_client.rlhf.list_interactions.return_value = {
         "interactions": sample_rlhf_interactions
     }
@@ -345,7 +345,7 @@ async def test_export_rlhf_data_feedback_only(
     sample_rlhf_interactions,
 ):
     """Test RLHF export with feedback_only filter."""
-    mock_zerodb_client.tables.query.return_value = {"rows": [sample_hackathon]}
+    mock_zerodb_client.tables.query_rows.return_value = [sample_hackathon]
     mock_zerodb_client.rlhf.list_interactions.return_value = {
         "interactions": sample_rlhf_interactions
     }
@@ -368,7 +368,7 @@ async def test_export_rlhf_data_csv(
     sample_rlhf_interactions,
 ):
     """Test RLHF data export in CSV format."""
-    mock_zerodb_client.tables.query.return_value = {"rows": [sample_hackathon]}
+    mock_zerodb_client.tables.query_rows.return_value = [sample_hackathon]
     mock_zerodb_client.rlhf.list_interactions.return_value = {
         "interactions": sample_rlhf_interactions
     }
@@ -391,7 +391,7 @@ async def test_export_rlhf_data_date_filter(
     sample_rlhf_interactions,
 ):
     """Test RLHF export with date filtering."""
-    mock_zerodb_client.tables.query.return_value = {"rows": [sample_hackathon]}
+    mock_zerodb_client.tables.query_rows.return_value = [sample_hackathon]
     mock_zerodb_client.rlhf.list_interactions.return_value = {
         "interactions": sample_rlhf_interactions
     }
@@ -425,12 +425,12 @@ async def test_archive_hackathon_success(
 ):
     """Test successful hackathon archival."""
     # Mock database queries
-    mock_zerodb_client.tables.query.side_effect = [
-        {"rows": [sample_hackathon]},  # Get hackathon
-        {"rows": sample_participants},  # Get participants
-        {"rows": sample_submissions},  # Get submissions
-        {"rows": sample_teams},  # Get teams
-        {"rows": []},  # Get judgments
+    mock_zerodb_client.tables.query_rows.side_effect = [
+        [sample_hackathon],  # Get hackathon
+        sample_participants,  # Get participants
+        sample_submissions,  # Get submissions
+        sample_teams,  # Get teams
+        [],  # Get judgments
     ]
 
     mock_zerodb_client.rlhf.list_interactions.return_value = {
@@ -473,12 +473,12 @@ async def test_archive_hackathon_with_delete(
     sample_participants,
 ):
     """Test archival with original data deletion."""
-    mock_zerodb_client.tables.query.side_effect = [
-        {"rows": [sample_hackathon]},
-        {"rows": sample_participants},
-        {"rows": []},
-        {"rows": []},
-        {"rows": []},
+    mock_zerodb_client.tables.query_rows.side_effect = [
+        [sample_hackathon],
+        sample_participants,
+        [],
+        [],
+        [],
     ]
 
     mock_zerodb_client.rlhf.list_interactions.return_value = {
@@ -507,7 +507,7 @@ async def test_archive_hackathon_not_completed(
 ):
     """Test archival of non-completed hackathon (should fail)."""
     active_hackathon = {**sample_hackathon, "status": "active"}
-    mock_zerodb_client.tables.query.return_value = {"rows": [active_hackathon]}
+    mock_zerodb_client.tables.query_rows.return_value = [active_hackathon]
 
     with pytest.raises(HTTPException) as exc_info:
         await export_service.archive_hackathon("hack-123")
@@ -519,7 +519,7 @@ async def test_archive_hackathon_not_completed(
 @pytest.mark.asyncio
 async def test_archive_hackathon_not_found(export_service, mock_zerodb_client):
     """Test archival of non-existent hackathon."""
-    mock_zerodb_client.tables.query.return_value = {"rows": []}
+    mock_zerodb_client.tables.query_rows.return_value = []
 
     with pytest.raises(HTTPException) as exc_info:
         await export_service.archive_hackathon("nonexistent")
@@ -533,18 +533,18 @@ async def test_archive_hackathon_not_found(export_service, mock_zerodb_client):
 @pytest.mark.asyncio
 async def test_get_hackathon_helper(export_service, mock_zerodb_client, sample_hackathon):
     """Test _get_hackathon helper method."""
-    mock_zerodb_client.tables.query.return_value = {"rows": [sample_hackathon]}
+    mock_zerodb_client.tables.query_rows.return_value = [sample_hackathon]
 
     result = await export_service._get_hackathon("hack-123")
 
     assert result == sample_hackathon
-    mock_zerodb_client.tables.query.assert_called_once()
+    mock_zerodb_client.tables.query_rows.assert_called_once()
 
 
 @pytest.mark.asyncio
 async def test_get_hackathon_not_found(export_service, mock_zerodb_client):
     """Test _get_hackathon with non-existent hackathon."""
-    mock_zerodb_client.tables.query.return_value = {"rows": []}
+    mock_zerodb_client.tables.query_rows.return_value = []
 
     with pytest.raises(ZeroDBNotFound):
         await export_service._get_hackathon("nonexistent")
@@ -621,11 +621,11 @@ async def test_export_json_with_empty_related_data(
     export_service, mock_zerodb_client, sample_hackathon
 ):
     """Test JSON export when hackathon has no participants/submissions."""
-    mock_zerodb_client.tables.query.side_effect = [
-        {"rows": [sample_hackathon]},
-        {"rows": []},  # No participants
-        {"rows": []},  # No submissions
-        {"rows": []},  # No teams
+    mock_zerodb_client.tables.query_rows.side_effect = [
+        [sample_hackathon],
+        [],  # No participants
+        [],  # No submissions
+        [],  # No teams
     ]
 
     result = await export_service.export_hackathon_json("hack-123")
@@ -641,7 +641,7 @@ async def test_export_rlhf_no_interactions(
     export_service, mock_zerodb_client, sample_hackathon
 ):
     """Test RLHF export with no interactions."""
-    mock_zerodb_client.tables.query.return_value = {"rows": [sample_hackathon]}
+    mock_zerodb_client.tables.query_rows.return_value = [sample_hackathon]
     mock_zerodb_client.rlhf.list_interactions.return_value = {"interactions": []}
 
     result = await export_service.export_rlhf_data("hack-123")
@@ -657,12 +657,12 @@ async def test_archive_cancelled_hackathon(
 ):
     """Test archiving a cancelled hackathon (should succeed)."""
     cancelled_hackathon = {**sample_hackathon, "status": "cancelled"}
-    mock_zerodb_client.tables.query.side_effect = [
-        {"rows": [cancelled_hackathon]},
-        {"rows": []},
-        {"rows": []},
-        {"rows": []},
-        {"rows": []},
+    mock_zerodb_client.tables.query_rows.side_effect = [
+        [cancelled_hackathon],
+        [],
+        [],
+        [],
+        [],
     ]
 
     mock_zerodb_client.rlhf.list_interactions.return_value = {"interactions": []}
@@ -689,35 +689,35 @@ async def test_full_export_workflow(
     """Test complete export workflow: JSON, CSV, PDF."""
     # Test JSON export
     json_service = ExportService(mock_zerodb_client)
-    mock_zerodb_client.tables.query.side_effect = [
-        {"rows": [sample_hackathon]},
-        {"rows": sample_participants},
-        {"rows": sample_submissions},
-        {"rows": []},
-        {"rows": []},
+    mock_zerodb_client.tables.query_rows.side_effect = [
+        [sample_hackathon],
+        sample_participants,
+        sample_submissions,
+        [],
+        [],
     ]
     json_result = await json_service.export_hackathon_json("hack-123")
     assert json_result["hackathon"] == sample_hackathon
 
     # Test CSV export
     csv_service = ExportService(mock_zerodb_client)
-    mock_zerodb_client.tables.query.side_effect = [
-        {"rows": [sample_hackathon]},
-        {"rows": sample_participants},
-        {"rows": sample_submissions},
-        {"rows": []},
+    mock_zerodb_client.tables.query_rows.side_effect = [
+        [sample_hackathon],
+        sample_participants,
+        sample_submissions,
+        [],
     ]
     csv_result = await csv_service.export_hackathon_csv("hack-123")
     assert "hack-123" in csv_result
 
     # Test PDF export
     pdf_service = ExportService(mock_zerodb_client)
-    mock_zerodb_client.tables.query.side_effect = [
-        {"rows": [sample_hackathon]},
-        {"rows": sample_participants},
-        {"rows": sample_submissions},
-        {"rows": []},
-        {"rows": []},
+    mock_zerodb_client.tables.query_rows.side_effect = [
+        [sample_hackathon],
+        sample_participants,
+        sample_submissions,
+        [],
+        [],
     ]
     pdf_result = await pdf_service.generate_pdf_report("hack-123")
     assert len(pdf_result) > 0

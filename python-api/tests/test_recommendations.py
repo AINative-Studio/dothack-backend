@@ -175,17 +175,15 @@ class TestRecommendSubmissionsForJudge:
                 {"submission_id": "sub-scored", "judge_id": "judge-456", "total_score": 80}
             ],  # Already scored
             [],  # All submissions
-            # No high-rated queries needed since we have 0 scored submissions for query building
-        ]
-
-        # Search returns both scored and unscored, but we should filter
-        mock_client.embeddings.search.return_value = [
-            {"id": "sub-scored", "score": 0.95, "metadata": {}},  # Should be excluded
-            {"id": "sub-new", "score": 0.90, "metadata": {}},  # Should be included
-        ]
-
-        # Mock query for the new submission only (scored should be filtered out)
-        mock_client.tables.query_rows.side_effect.append(
+            # High-rated submission detail query (1 scored submission triggers this)
+            [
+                {
+                    "submission_id": "sub-scored",
+                    "project_name": "Scored Project",
+                    "description": "Already scored submission",
+                }
+            ],
+            # Query for the new submission details (scored one is filtered out)
             [
                 {
                     "submission_id": "sub-new",
@@ -196,8 +194,14 @@ class TestRecommendSubmissionsForJudge:
                     "status": "SUBMITTED",
                     "created_at": "2024-01-15T10:00:00Z",
                 }
-            ]
-        )
+            ],
+        ]
+
+        # Search returns both scored and unscored, but we should filter
+        mock_client.embeddings.search.return_value = [
+            {"id": "sub-scored", "score": 0.95, "metadata": {}},  # Should be excluded
+            {"id": "sub-new", "score": 0.90, "metadata": {}},  # Should be included
+        ]
 
         service = RecommendationsService(mock_client)
 

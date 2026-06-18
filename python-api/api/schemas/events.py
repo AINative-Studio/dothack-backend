@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Any, Dict, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class BaseEventMetadata(BaseModel):
@@ -55,24 +55,23 @@ class HackathonEventData(BaseModel):
     location: Optional[str] = Field(None, description="Hackathon location")
     metadata: BaseEventMetadata = Field(..., description="Event metadata")
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "hackathon_id": "hack-123-abc",
-                "name": "AI Hackathon 2024",
-                "status": "active",
-                "organizer_id": "user-456-def",
-                "start_date": "2024-03-01T00:00:00Z",
-                "end_date": "2024-03-03T23:59:59Z",
-                "location": "San Francisco",
-                "metadata": {
-                    "user_id": "user-456-def",
-                    "timestamp": "2024-03-01T00:00:00Z",
-                    "correlation_id": "corr-abc-123",
-                    "source": "dothack-api"
-                }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "hackathon_id": "hack-123-abc",
+            "name": "AI Hackathon 2024",
+            "status": "active",
+            "organizer_id": "user-456-def",
+            "start_date": "2024-03-01T00:00:00Z",
+            "end_date": "2024-03-03T23:59:59Z",
+            "location": "San Francisco",
+            "metadata": {
+                "user_id": "user-456-def",
+                "timestamp": "2024-03-01T00:00:00Z",
+                "correlation_id": "corr-abc-123",
+                "source": "dothack-api"
             }
         }
+    })
 
 
 class TeamEventData(BaseModel):
@@ -104,24 +103,23 @@ class TeamEventData(BaseModel):
     track_id: Optional[str] = Field(None, description="Track ID")
     metadata: BaseEventMetadata = Field(..., description="Event metadata")
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "team_id": "team-789-xyz",
-                "hackathon_id": "hack-123-abc",
-                "name": "AI Innovators",
-                "creator_id": "user-111-aaa",
-                "status": "FORMING",
-                "member_count": 1,
-                "track_id": "track-ai-ml",
-                "metadata": {
-                    "user_id": "user-111-aaa",
-                    "timestamp": "2024-03-01T10:30:00Z",
-                    "correlation_id": "corr-def-456",
-                    "source": "dothack-api"
-                }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "team_id": "team-789-xyz",
+            "hackathon_id": "hack-123-abc",
+            "name": "AI Innovators",
+            "creator_id": "user-111-aaa",
+            "status": "FORMING",
+            "member_count": 1,
+            "track_id": "track-ai-ml",
+            "metadata": {
+                "user_id": "user-111-aaa",
+                "timestamp": "2024-03-01T10:30:00Z",
+                "correlation_id": "corr-def-456",
+                "source": "dothack-api"
             }
         }
+    })
 
 
 class SubmissionEventData(BaseModel):
@@ -152,24 +150,23 @@ class SubmissionEventData(BaseModel):
     submitted_by: str = Field(..., description="User ID who submitted")
     metadata: BaseEventMetadata = Field(..., description="Event metadata")
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "submission_id": "sub-222-bbb",
-                "hackathon_id": "hack-123-abc",
-                "team_id": "team-789-xyz",
-                "track_id": "track-ai-ml",
-                "title": "AI-Powered Code Assistant",
-                "status": "SUBMITTED",
-                "submitted_by": "user-111-aaa",
-                "metadata": {
-                    "user_id": "user-111-aaa",
-                    "timestamp": "2024-03-03T20:00:00Z",
-                    "correlation_id": "corr-ghi-789",
-                    "source": "dothack-api"
-                }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "submission_id": "sub-222-bbb",
+            "hackathon_id": "hack-123-abc",
+            "team_id": "team-789-xyz",
+            "track_id": "track-ai-ml",
+            "title": "AI-Powered Code Assistant",
+            "status": "SUBMITTED",
+            "submitted_by": "user-111-aaa",
+            "metadata": {
+                "user_id": "user-111-aaa",
+                "timestamp": "2024-03-03T20:00:00Z",
+                "correlation_id": "corr-ghi-789",
+                "source": "dothack-api"
             }
         }
+    })
 
 
 class ScoreEventData(BaseModel):
@@ -204,26 +201,25 @@ class ScoreEventData(BaseModel):
     total_score: Optional[float] = Field(None, description="Total score")
     metadata: BaseEventMetadata = Field(..., description="Event metadata")
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "score_id": "score-333-ccc",
-                "submission_id": "sub-222-bbb",
-                "hackathon_id": "hack-123-abc",
-                "judge_id": "judge-444-ddd",
-                "technical_score": 8.5,
-                "creativity_score": 9.0,
-                "impact_score": 7.5,
-                "presentation_score": 8.0,
-                "total_score": 8.25,
-                "metadata": {
-                    "user_id": "judge-444-ddd",
-                    "timestamp": "2024-03-04T15:30:00Z",
-                    "correlation_id": "corr-jkl-012",
-                    "source": "dothack-api"
-                }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "score_id": "score-333-ccc",
+            "submission_id": "sub-222-bbb",
+            "hackathon_id": "hack-123-abc",
+            "judge_id": "judge-444-ddd",
+            "technical_score": 8.5,
+            "creativity_score": 9.0,
+            "impact_score": 7.5,
+            "presentation_score": 8.0,
+            "total_score": 8.25,
+            "metadata": {
+                "user_id": "judge-444-ddd",
+                "timestamp": "2024-03-04T15:30:00Z",
+                "correlation_id": "corr-jkl-012",
+                "source": "dothack-api"
             }
         }
+    })
 
 
 class EventPublishRequest(BaseModel):
@@ -241,22 +237,21 @@ class EventPublishRequest(BaseModel):
     data: Dict[str, Any] = Field(..., description="Event data payload")
     correlation_id: Optional[str] = Field(None, description="Correlation ID for tracking")
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "event_type": "hackathon.created",
-                "data": {
-                    "hackathon_id": "hack-123-abc",
-                    "name": "AI Hackathon 2024",
-                    "status": "draft",
-                    "organizer_id": "user-456-def",
-                    "metadata": {
-                        "user_id": "user-456-def",
-                        "timestamp": "2024-03-01T00:00:00Z"
-                    }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "event_type": "hackathon.created",
+            "data": {
+                "hackathon_id": "hack-123-abc",
+                "name": "AI Hackathon 2024",
+                "status": "draft",
+                "organizer_id": "user-456-def",
+                "metadata": {
+                    "user_id": "user-456-def",
+                    "timestamp": "2024-03-01T00:00:00Z"
                 }
             }
         }
+    })
 
 
 class EventPublishResponse(BaseModel):
@@ -276,13 +271,12 @@ class EventPublishResponse(BaseModel):
     timestamp: datetime = Field(..., description="Publication timestamp")
     message: str = Field(default="Event published successfully", description="Success message")
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "success": True,
-                "event_id": "evt-555-eee",
-                "event_type": "hackathon.created",
-                "timestamp": "2024-03-01T00:00:00Z",
-                "message": "Event published successfully"
-            }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "success": True,
+            "event_id": "evt-555-eee",
+            "event_type": "hackathon.created",
+            "timestamp": "2024-03-01T00:00:00Z",
+            "message": "Event published successfully"
         }
+    })

@@ -171,7 +171,7 @@ class TestFindSimilarSubmissions:
         # Assert
         call_args = mock_client.embeddings.search.call_args
         assert call_args[1]["namespace"] == "global/submissions"
-        assert call_args[1]["filter"] == {}
+        assert call_args[1]["filter"] is None
 
     @pytest.mark.asyncio
     async def test_find_similar_submissions_excludes_self(self):

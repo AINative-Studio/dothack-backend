@@ -4,7 +4,7 @@ Tests for health check endpoint.
 Following TDD approach - tests written before implementation.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 import pytest
 
@@ -57,9 +57,9 @@ def test_health_endpoint_timestamp_is_recent(client):
     """
     Test that the health endpoint timestamp is recent (within last 5 seconds).
     """
-    before = datetime.utcnow()
+    before = datetime.now(timezone.utc)
     response = client.get("/health")
-    after = datetime.utcnow()
+    after = datetime.now(timezone.utc)
 
     data = response.json()
     timestamp = datetime.fromisoformat(data["timestamp"])

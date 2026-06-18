@@ -49,13 +49,15 @@ class TestZeroDBClientInitialization:
         )
         assert client.timeout == 60.0
 
-    def test_client_initialization_missing_api_key(self):
+    def test_client_initialization_missing_api_key(self, monkeypatch):
         """Should raise error when API key is missing"""
+        monkeypatch.delenv("ZERODB_API_KEY", raising=False)
         with pytest.raises(ValueError, match="api_key is required"):
             ZeroDBClient(api_key=None, project_id="test-project")
 
-    def test_client_initialization_missing_project_id(self):
+    def test_client_initialization_missing_project_id(self, monkeypatch):
         """Should raise error when project_id is missing"""
+        monkeypatch.delenv("ZERODB_PROJECT_ID", raising=False)
         with pytest.raises(ValueError, match="project_id is required"):
             ZeroDBClient(api_key="test-key", project_id=None)
 
@@ -68,6 +70,9 @@ class TestZeroDBClientAuthentication:
         """Should include Authorization header in requests"""
         client = ZeroDBClient(api_key="test-key", project_id="test-project")
 
+        # Auth headers are set on the httpx.AsyncClient at init time
+        assert client._http_client.headers["Authorization"] == "Bearer test-key"
+
         with patch.object(client._http_client, "request", new_callable=AsyncMock) as mock_request:
             mock_request.return_value = Mock(
                 status_code=200,
@@ -75,11 +80,7 @@ class TestZeroDBClientAuthentication:
             )
 
             await client._request("GET", "/test")
-
             mock_request.assert_called_once()
-            call_kwargs = mock_request.call_args[1]
-            assert "headers" in call_kwargs
-            assert call_kwargs["headers"]["Authorization"] == "Bearer test-key"
 
     @pytest.mark.asyncio
     async def test_handles_401_unauthorized(self):

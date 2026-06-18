@@ -34,14 +34,13 @@ async def get_featured_by_hackathon_id(
         Featured entry dict if found, None otherwise
     """
     try:
-        response = await zerodb.tables.query_rows(
-            table_id="featured_hackathons",
+        rows = await zerodb.tables.query_rows("featured_hackathons",
             filter={"hackathon_id": hackathon_id},
             limit=1
         )
 
-        if response and response.get("rows"):
-            featured = response["rows"][0]
+        if rows:
+            featured = rows[0]
             if exclude_id and featured.get("id") == exclude_id:
                 return None
             return featured
@@ -67,8 +66,7 @@ async def verify_hackathon_exists(hackathon_id: str, zerodb: ZeroDBClient) -> bo
         True if hackathon exists, raises HTTPException otherwise
     """
     try:
-        response = await zerodb.tables.query_rows(
-            table_id="hackathons",
+        rows = await zerodb.tables.query_rows("hackathons",
             filter={"id": hackathon_id},
             limit=1
         )
@@ -101,8 +99,7 @@ async def get_next_display_order(zerodb: ZeroDBClient) -> int:
         Next display order number
     """
     try:
-        response = await zerodb.tables.query_rows(
-            table_id="featured_hackathons",
+        rows = await zerodb.tables.query_rows("featured_hackathons",
             filter={},
             limit=1000  # Get all featured hackathons
         )
@@ -201,8 +198,7 @@ async def get_featured(featured_id: str, zerodb: ZeroDBClient) -> Dict:
         HTTPException: If featured entry not found or database error
     """
     try:
-        response = await zerodb.tables.query_rows(
-            table_id="featured_hackathons",
+        rows = await zerodb.tables.query_rows("featured_hackathons",
             filter={"id": featured_id},
             limit=1
         )
@@ -213,7 +209,7 @@ async def get_featured(featured_id: str, zerodb: ZeroDBClient) -> Dict:
                 detail=f"Featured entry {featured_id} not found"
             )
 
-        return response["rows"][0]
+        return rows[0]
 
     except HTTPException:
         raise
@@ -237,14 +233,13 @@ async def get_hackathon_details(hackathon_id: str, zerodb: ZeroDBClient) -> Opti
         Hackathon details dict or None if not found
     """
     try:
-        response = await zerodb.tables.query_rows(
-            table_id="hackathons",
+        rows = await zerodb.tables.query_rows("hackathons",
             filter={"id": hackathon_id},
             limit=1
         )
 
-        if response and response.get("rows"):
-            return response["rows"][0]
+        if rows:
+            return rows[0]
         return None
 
     except Exception as e:
@@ -271,13 +266,12 @@ async def list_featured(zerodb: ZeroDBClient, include_hackathon_details: bool = 
         HTTPException: If database error occurs
     """
     try:
-        response = await zerodb.tables.query_rows(
-            table_id="featured_hackathons",
+        rows = await zerodb.tables.query_rows("featured_hackathons",
             filter={"is_active": True},
             limit=1000
         )
 
-        featured_entries = response.get("rows", [])
+        featured_entries = rows
         now = datetime.utcnow()
 
         # Filter out expired entries

@@ -8,7 +8,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ExportFormat(str, Enum):
@@ -42,16 +42,15 @@ class ExportRequest(BaseModel):
         description="Include judgment/scoring data in export"
     )
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "format": "json",
-                "include_participants": True,
-                "include_submissions": True,
-                "include_teams": True,
-                "include_judgments": False
-            }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "format": "json",
+            "include_participants": True,
+            "include_submissions": True,
+            "include_teams": True,
+            "include_judgments": False
         }
+    })
 
 
 class ExportResponse(BaseModel):
@@ -78,25 +77,24 @@ class ExportResponse(BaseModel):
     )
     generated_at: datetime
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "success": True,
-                "format": "json",
-                "data": {
-                    "hackathon": {
-                        "hackathon_id": "hack-123",
-                        "name": "AI Hackathon 2025",
-                        "status": "completed"
-                    },
-                    "participants": 150,
-                    "submissions": 45,
-                    "teams": 30
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "success": True,
+            "format": "json",
+            "data": {
+                "hackathon": {
+                    "hackathon_id": "hack-123",
+                    "name": "AI Hackathon 2025",
+                    "status": "completed"
                 },
-                "file_size_bytes": 25600,
-                "generated_at": "2024-12-28T10:00:00Z"
-            }
+                "participants": 150,
+                "submissions": 45,
+                "teams": 30
+            },
+            "file_size_bytes": 25600,
+            "generated_at": "2024-12-28T10:00:00Z"
         }
+    })
 
 
 class RLHFExportRequest(BaseModel):
@@ -119,15 +117,14 @@ class RLHFExportRequest(BaseModel):
         description="Export format (JSON or CSV only for RLHF)"
     )
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "start_date": "2024-01-01T00:00:00Z",
-                "end_date": "2024-12-31T23:59:59Z",
-                "include_feedback_only": True,
-                "format": "json"
-            }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "start_date": "2024-01-01T00:00:00Z",
+            "end_date": "2024-12-31T23:59:59Z",
+            "include_feedback_only": True,
+            "format": "json"
         }
+    })
 
 
 class RLHFExportResponse(BaseModel):
@@ -143,28 +140,27 @@ class RLHFExportResponse(BaseModel):
     expires_at: Optional[datetime] = None
     generated_at: datetime
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "success": True,
-                "format": "json",
-                "total_interactions": 250,
-                "interactions_with_feedback": 200,
-                "data": [
-                    {
-                        "interaction_id": "int-123",
-                        "prompt": "Recommend submissions",
-                        "response": "Here are 5 recommendations",
-                        "feedback": {
-                            "type": "rating",
-                            "rating": 5
-                        }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "success": True,
+            "format": "json",
+            "total_interactions": 250,
+            "interactions_with_feedback": 200,
+            "data": [
+                {
+                    "interaction_id": "int-123",
+                    "prompt": "Recommend submissions",
+                    "response": "Here are 5 recommendations",
+                    "feedback": {
+                        "type": "rating",
+                        "rating": 5
                     }
-                ],
-                "file_size_bytes": 51200,
-                "generated_at": "2024-12-28T10:00:00Z"
-            }
+                }
+            ],
+            "file_size_bytes": 51200,
+            "generated_at": "2024-12-28T10:00:00Z"
         }
+    })
 
 
 class ArchiveRequest(BaseModel):
@@ -183,14 +179,13 @@ class ArchiveRequest(BaseModel):
         description="Include analytics and summary statistics in archive"
     )
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "confirm": True,
-                "delete_after_archive": False,
-                "include_analytics": True
-            }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "confirm": True,
+            "delete_after_archive": False,
+            "include_analytics": True
         }
+    })
 
 
 class ArchiveResponse(BaseModel):
@@ -221,27 +216,26 @@ class ArchiveResponse(BaseModel):
     )
     archived_at: datetime
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "success": True,
-                "hackathon_id": "hack-123",
-                "archive_id": "archive-abc-456",
-                "archive_url": "https://storage.example.com/archives/archive-abc-456.zip",
-                "archive_size_bytes": 1048576,
-                "items_archived": {
-                    "hackathon": 1,
-                    "participants": 150,
-                    "submissions": 45,
-                    "teams": 30,
-                    "judgments": 135,
-                    "rlhf_interactions": 250
-                },
-                "original_deleted": False,
-                "expires_at": "2025-01-28T10:00:00Z",
-                "archived_at": "2024-12-28T10:00:00Z"
-            }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "success": True,
+            "hackathon_id": "hack-123",
+            "archive_id": "archive-abc-456",
+            "archive_url": "https://storage.example.com/archives/archive-abc-456.zip",
+            "archive_size_bytes": 1048576,
+            "items_archived": {
+                "hackathon": 1,
+                "participants": 150,
+                "submissions": 45,
+                "teams": 30,
+                "judgments": 135,
+                "rlhf_interactions": 250
+            },
+            "original_deleted": False,
+            "expires_at": "2025-01-28T10:00:00Z",
+            "archived_at": "2024-12-28T10:00:00Z"
         }
+    })
 
 
 class ExportStatusResponse(BaseModel):
@@ -264,14 +258,13 @@ class ExportStatusResponse(BaseModel):
     created_at: datetime
     completed_at: Optional[datetime] = None
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "export_id": "export-xyz-789",
-                "status": "completed",
-                "progress_percent": 100,
-                "file_url": "https://storage.example.com/exports/export-xyz-789.pdf",
-                "created_at": "2024-12-28T09:55:00Z",
-                "completed_at": "2024-12-28T10:00:00Z"
-            }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "export_id": "export-xyz-789",
+            "status": "completed",
+            "progress_percent": 100,
+            "file_url": "https://storage.example.com/exports/export-xyz-789.pdf",
+            "created_at": "2024-12-28T09:55:00Z",
+            "completed_at": "2024-12-28T10:00:00Z"
         }
+    })

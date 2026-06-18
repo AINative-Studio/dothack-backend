@@ -7,7 +7,7 @@ Request and response models for AI-powered recommendations endpoints.
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class RecommendedSubmissionItem(BaseModel):
@@ -26,21 +26,20 @@ class RecommendedSubmissionItem(BaseModel):
     presentation_url: Optional[str] = None
     track_id: Optional[str] = None
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "submission_id": "sub-123",
-                "team_id": "team-456",
-                "hackathon_id": "hack-789",
-                "project_name": "AI Healthcare Assistant",
-                "description": "An AI-powered chatbot for medical diagnosis",
-                "relevance_score": 0.92,
-                "status": "SUBMITTED",
-                "created_at": "2024-01-15T10:30:00Z",
-                "repository_url": "https://github.com/team/project",
-                "demo_url": "https://demo.example.com",
-            }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "submission_id": "sub-123",
+            "team_id": "team-456",
+            "hackathon_id": "hack-789",
+            "project_name": "AI Healthcare Assistant",
+            "description": "An AI-powered chatbot for medical diagnosis",
+            "relevance_score": 0.92,
+            "status": "SUBMITTED",
+            "created_at": "2024-01-15T10:30:00Z",
+            "repository_url": "https://github.com/team/project",
+            "demo_url": "https://demo.example.com",
         }
+    })
 
 
 class JudgeRecommendationsResponse(BaseModel):
@@ -53,26 +52,25 @@ class JudgeRecommendationsResponse(BaseModel):
         None, ge=0, description="Execution time in milliseconds"
     )
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "recommended_submissions": [
-                    {
-                        "submission_id": "sub-123",
-                        "team_id": "team-456",
-                        "hackathon_id": "hack-789",
-                        "project_name": "AI Healthcare Assistant",
-                        "description": "An AI-powered chatbot",
-                        "relevance_score": 0.92,
-                        "status": "SUBMITTED",
-                        "created_at": "2024-01-15T10:30:00Z",
-                    }
-                ],
-                "total_recommended": 1,
-                "recommendation_reason": "Based on your highly-rated submissions",
-                "execution_time_ms": 145.23,
-            }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "recommended_submissions": [
+                {
+                    "submission_id": "sub-123",
+                    "team_id": "team-456",
+                    "hackathon_id": "hack-789",
+                    "project_name": "AI Healthcare Assistant",
+                    "description": "An AI-powered chatbot",
+                    "relevance_score": 0.92,
+                    "status": "SUBMITTED",
+                    "created_at": "2024-01-15T10:30:00Z",
+                }
+            ],
+            "total_recommended": 1,
+            "recommendation_reason": "Based on your highly-rated submissions",
+            "execution_time_ms": 145.23,
         }
+    })
 
 
 class SuggestedParticipantItem(BaseModel):
@@ -87,20 +85,19 @@ class SuggestedParticipantItem(BaseModel):
         None, description="Additional participant metadata"
     )
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "participant_id": "user-123",
-                "hackathon_id": "hack-456",
-                "match_score": 0.87,
-                "role": "BUILDER",
-                "joined_at": "2024-01-10T08:00:00Z",
-                "metadata": {
-                    "skills": ["Python", "React", "Machine Learning"],
-                    "experience_level": "Intermediate",
-                },
-            }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "participant_id": "user-123",
+            "hackathon_id": "hack-456",
+            "match_score": 0.87,
+            "role": "BUILDER",
+            "joined_at": "2024-01-10T08:00:00Z",
+            "metadata": {
+                "skills": ["Python", "React", "Machine Learning"],
+                "experience_level": "Intermediate",
+            },
         }
+    })
 
 
 class TeamSuggestionsRequest(BaseModel):
@@ -109,7 +106,7 @@ class TeamSuggestionsRequest(BaseModel):
     desired_skills: Optional[List[str]] = Field(
         None,
         description="Optional list of desired skills to match",
-        max_items=10,
+        max_length=10,
     )
     top_k: int = Field(
         10,
@@ -118,13 +115,12 @@ class TeamSuggestionsRequest(BaseModel):
         description="Maximum number of suggestions to return",
     )
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "desired_skills": ["Python", "Machine Learning", "React"],
-                "top_k": 10,
-            }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "desired_skills": ["Python", "Machine Learning", "React"],
+            "top_k": 10,
         }
+    })
 
 
 class TeamSuggestionsResponse(BaseModel):
@@ -137,24 +133,23 @@ class TeamSuggestionsResponse(BaseModel):
         None, ge=0, description="Execution time in milliseconds"
     )
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "suggested_participants": [
-                    {
-                        "participant_id": "user-123",
-                        "hackathon_id": "hack-456",
-                        "match_score": 0.87,
-                        "role": "BUILDER",
-                        "joined_at": "2024-01-10T08:00:00Z",
-                        "metadata": {"skills": ["Python", "React"]},
-                    }
-                ],
-                "total_suggested": 1,
-                "suggestion_reason": "Participants with skills: Python, Machine Learning",
-                "execution_time_ms": 132.45,
-            }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "suggested_participants": [
+                {
+                    "participant_id": "user-123",
+                    "hackathon_id": "hack-456",
+                    "match_score": 0.87,
+                    "role": "BUILDER",
+                    "joined_at": "2024-01-10T08:00:00Z",
+                    "metadata": {"skills": ["Python", "React"]},
+                }
+            ],
+            "total_suggested": 1,
+            "suggestion_reason": "Participants with skills: Python, Machine Learning",
+            "execution_time_ms": 132.45,
         }
+    })
 
 
 class RecommendationFeedbackRequest(BaseModel):
@@ -177,14 +172,13 @@ class RecommendationFeedbackRequest(BaseModel):
         description="Optional feedback comment",
     )
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "feedback_type": "rating",
-                "rating": 5,
-                "comment": "Great recommendations, very relevant to my expertise!",
-            }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "feedback_type": "rating",
+            "rating": 5,
+            "comment": "Great recommendations, very relevant to my expertise!",
         }
+    })
 
 
 class RecommendationFeedbackResponse(BaseModel):
@@ -194,11 +188,10 @@ class RecommendationFeedbackResponse(BaseModel):
     recommendation_id: str
     feedback_tracked: bool
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "success": True,
-                "recommendation_id": "rec-123",
-                "feedback_tracked": True,
-            }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "success": True,
+            "recommendation_id": "rec-123",
+            "feedback_tracked": True,
         }
+    })

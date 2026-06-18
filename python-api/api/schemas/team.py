@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import List, Literal, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 # Team Member Schemas
@@ -40,8 +40,7 @@ class TeamMemberResponse(TeamMemberBase):
     id: UUID
     team_id: UUID
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AddTeamMemberRequest(BaseModel):
@@ -158,8 +157,7 @@ class TeamResponse(TeamBase):
     members: Optional[List[TeamMemberResponse]] = None
     member_count: Optional[int] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class TeamListResponse(BaseModel):

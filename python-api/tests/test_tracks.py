@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from api.routes.tracks import get_current_user, get_zerodb_client, router
-from fastapi import FastAPI, status
+from fastapi import FastAPI, HTTPException, status
 from fastapi.testclient import TestClient
 from integrations.zerodb.exceptions import ZeroDBError, ZeroDBNotFound
 
@@ -58,8 +58,8 @@ def client(mock_user, mock_zerodb_client):
 class TestCreateTrackEndpoint:
     """Test POST /hackathons/{hackathon_id}/tracks - Create track"""
 
-    @patch("api.routes.tracks.track_service.create_track")
-    @patch("api.routes.tracks.check_organizer")
+    @patch("api.routes.tracks.track_service.create_track", new_callable=AsyncMock)
+    @patch("api.routes.tracks.check_organizer", new_callable=AsyncMock)
     def test_create_track_success(
         self, mock_check_organizer, mock_create, client, mock_user
     ):
@@ -94,8 +94,8 @@ class TestCreateTrackEndpoint:
         assert data["name"] == "AI/ML Track"
         assert data["description"] == "Machine learning projects"
 
-    @patch("api.routes.tracks.track_service.create_track")
-    @patch("api.routes.tracks.check_organizer")
+    @patch("api.routes.tracks.track_service.create_track", new_callable=AsyncMock)
+    @patch("api.routes.tracks.check_organizer", new_callable=AsyncMock)
     def test_create_track_minimal_fields(
         self, mock_check_organizer, mock_create, client
     ):
@@ -126,7 +126,7 @@ class TestCreateTrackEndpoint:
         assert data["name"] == "Web3 Track"
         assert data["description"] is None
 
-    @patch("api.routes.tracks.check_organizer")
+    @patch("api.routes.tracks.check_organizer", new_callable=AsyncMock)
     def test_create_track_invalid_name_too_short(self, mock_check_organizer, client):
         """Should reject track with name too short"""
         # Arrange
@@ -142,8 +142,8 @@ class TestCreateTrackEndpoint:
         # Assert
         assert response.status_code == 422
 
-    @patch("api.routes.tracks.track_service.create_track")
-    @patch("api.routes.tracks.check_organizer")
+    @patch("api.routes.tracks.track_service.create_track", new_callable=AsyncMock)
+    @patch("api.routes.tracks.check_organizer", new_callable=AsyncMock)
     def test_create_track_duplicate_name(
         self, mock_check_organizer, mock_create, client
     ):
@@ -151,7 +151,10 @@ class TestCreateTrackEndpoint:
         # Arrange
         hackathon_id = str(uuid.uuid4())
         mock_check_organizer.return_value = None
-        mock_create.side_effect = ZeroDBError("Track already exists")
+        mock_create.side_effect = HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Track with name 'Existing Track' already exists for this hackathon",
+        )
 
         # Act
         response = client.post(
@@ -160,13 +163,13 @@ class TestCreateTrackEndpoint:
         )
 
         # Assert
-        assert response.status_code == 500
+        assert response.status_code == 409
 
 
 class TestListTracksEndpoint:
     """Test GET /hackathons/{hackathon_id}/tracks - List tracks"""
 
-    @patch("api.routes.tracks.track_service.list_tracks")
+    @patch("api.routes.tracks.track_service.list_tracks", new_callable=AsyncMock)
     def test_list_tracks_success(self, mock_list, client):
         """Should return list of tracks"""
         # Arrange
@@ -207,7 +210,7 @@ class TestListTracksEndpoint:
         assert data["tracks"][0]["name"] == "AI/ML Track"
         assert data["tracks"][1]["name"] == "Web3 Track"
 
-    @patch("api.routes.tracks.track_service.list_tracks")
+    @patch("api.routes.tracks.track_service.list_tracks", new_callable=AsyncMock)
     def test_list_tracks_empty(self, mock_list, client):
         """Should return empty list when no tracks"""
         # Arrange
@@ -227,7 +230,7 @@ class TestListTracksEndpoint:
 class TestGetTrackEndpoint:
     """Test GET /hackathons/{hackathon_id}/tracks/{track_id} - Get track"""
 
-    @patch("api.routes.tracks.track_service.get_track")
+    @patch("api.routes.tracks.track_service.get_track", new_callable=AsyncMock)
     def test_get_track_success(self, mock_get, client):
         """Should return single track"""
         # Arrange
@@ -254,13 +257,16 @@ class TestGetTrackEndpoint:
         assert data["track_id"] == track_id
         assert data["name"] == "AI/ML Track"
 
-    @patch("api.routes.tracks.track_service.get_track")
+    @patch("api.routes.tracks.track_service.get_track", new_callable=AsyncMock)
     def test_get_track_not_found(self, mock_get, client):
         """Should return 404 when track not found"""
         # Arrange
         track_id = str(uuid.uuid4())
         hackathon_id = str(uuid.uuid4())
-        mock_get.side_effect = ZeroDBNotFound("Track not found")
+        mock_get.side_effect = HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Track {track_id} not found",
+        )
 
         # Act
         response = client.get(
@@ -268,14 +274,14 @@ class TestGetTrackEndpoint:
         )
 
         # Assert
-        assert response.status_code == 500
+        assert response.status_code == 404
 
 
 class TestUpdateTrackEndpoint:
     """Test PUT /hackathons/{hackathon_id}/tracks/{track_id} - Update track"""
 
-    @patch("api.routes.tracks.track_service.update_track")
-    @patch("api.routes.tracks.check_organizer")
+    @patch("api.routes.tracks.track_service.update_track", new_callable=AsyncMock)
+    @patch("api.routes.tracks.check_organizer", new_callable=AsyncMock)
     def test_update_track_success(
         self, mock_check_organizer, mock_update, client, mock_user
     ):
@@ -309,8 +315,8 @@ class TestUpdateTrackEndpoint:
         assert data["name"] == "Updated AI/ML Track"
         assert data["description"] == "Updated description"
 
-    @patch("api.routes.tracks.track_service.get_track")
-    @patch("api.routes.tracks.check_organizer")
+    @patch("api.routes.tracks.track_service.get_track", new_callable=AsyncMock)
+    @patch("api.routes.tracks.check_organizer", new_callable=AsyncMock)
     def test_update_track_no_changes(
         self, mock_check_organizer, mock_get, client
     ):
@@ -344,8 +350,8 @@ class TestUpdateTrackEndpoint:
 class TestDeleteTrackEndpoint:
     """Test DELETE /hackathons/{hackathon_id}/tracks/{track_id} - Delete track"""
 
-    @patch("api.routes.tracks.track_service.delete_track")
-    @patch("api.routes.tracks.check_organizer")
+    @patch("api.routes.tracks.track_service.delete_track", new_callable=AsyncMock)
+    @patch("api.routes.tracks.check_organizer", new_callable=AsyncMock)
     def test_delete_track_success(
         self, mock_check_organizer, mock_delete, client, mock_user
     ):
@@ -365,8 +371,8 @@ class TestDeleteTrackEndpoint:
         # Assert
         assert response.status_code == 204
 
-    @patch("api.routes.tracks.track_service.delete_track")
-    @patch("api.routes.tracks.check_organizer")
+    @patch("api.routes.tracks.track_service.delete_track", new_callable=AsyncMock)
+    @patch("api.routes.tracks.check_organizer", new_callable=AsyncMock)
     def test_delete_track_with_teams(
         self, mock_check_organizer, mock_delete, client
     ):
@@ -376,7 +382,10 @@ class TestDeleteTrackEndpoint:
         hackathon_id = str(uuid.uuid4())
 
         mock_check_organizer.return_value = None
-        mock_delete.side_effect = ZeroDBError("Cannot delete track with teams")
+        mock_delete.side_effect = HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cannot delete track with teams",
+        )
 
         # Act
         response = client.delete(
@@ -384,4 +393,4 @@ class TestDeleteTrackEndpoint:
         )
 
         # Assert
-        assert response.status_code == 500
+        assert response.status_code == 409

@@ -5,7 +5,7 @@ Provides specific error types for different authentication failure scenarios.
 All exceptions include structured error codes and consistent error messaging.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 
@@ -114,7 +114,7 @@ def format_error_response(
     response = {
         "detail": error.message,
         "error_code": error.error_code,
-        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
     }
 
     if request_id:

@@ -53,73 +53,62 @@ class TestAINativeAuthClient:
             )
 
     @pytest.mark.asyncio
-    async def test_verify_token_invalid_returns_none(self, auth_client):
-        """Test that invalid token returns None"""
-        # Arrange
+    async def test_verify_token_invalid_raises_error(self, auth_client):
+        """Test that invalid token raises InvalidTokenError"""
+        from integrations.ainative.exceptions import InvalidTokenError
+
         token = "invalid_token"
 
-        # Mock 401 response
         with patch.object(auth_client.client, "get", new_callable=AsyncMock) as mock_get:
             mock_response = MagicMock()
             mock_response.status_code = 401
+            mock_response.json.return_value = {"detail": "Invalid token"}
             mock_get.return_value = mock_response
 
-            # Act
-            result = await auth_client.verify_token(token)
-
-            # Assert
-            assert result is None
+            with pytest.raises(InvalidTokenError):
+                await auth_client.verify_token(token)
 
     @pytest.mark.asyncio
-    async def test_verify_token_expired_returns_none(self, auth_client):
-        """Test that expired token returns None"""
-        # Arrange
+    async def test_verify_token_expired_raises_error(self, auth_client):
+        """Test that expired token raises TokenExpiredError"""
+        from integrations.ainative.exceptions import TokenExpiredError
+
         token = "expired_token"
 
-        # Mock 401 response
         with patch.object(auth_client.client, "get", new_callable=AsyncMock) as mock_get:
             mock_response = MagicMock()
             mock_response.status_code = 401
             mock_response.json.return_value = {"detail": "Token expired"}
             mock_get.return_value = mock_response
 
-            # Act
-            result = await auth_client.verify_token(token)
-
-            # Assert
-            assert result is None
+            with pytest.raises(TokenExpiredError):
+                await auth_client.verify_token(token)
 
     @pytest.mark.asyncio
-    async def test_verify_token_network_error_returns_none(self, auth_client):
-        """Test that network errors return None gracefully"""
-        # Arrange
+    async def test_verify_token_network_error_raises_error(self, auth_client):
+        """Test that network errors raise AINativeConnectionError"""
+        from integrations.ainative.exceptions import AINativeConnectionError
+
         token = "some_token"
 
-        # Mock network error
         with patch.object(auth_client.client, "get", new_callable=AsyncMock) as mock_get:
             mock_get.side_effect = httpx.ConnectError("Connection failed")
 
-            # Act
-            result = await auth_client.verify_token(token)
-
-            # Assert
-            assert result is None
+            with pytest.raises(AINativeConnectionError):
+                await auth_client.verify_token(token)
 
     @pytest.mark.asyncio
-    async def test_verify_token_timeout_returns_none(self, auth_client):
-        """Test that timeout errors return None gracefully"""
-        # Arrange
+    async def test_verify_token_timeout_raises_error(self, auth_client):
+        """Test that timeout errors raise AINativeTimeoutError"""
+        from integrations.ainative.exceptions import AINativeTimeoutError
+
         token = "some_token"
 
-        # Mock timeout error
         with patch.object(auth_client.client, "get", new_callable=AsyncMock) as mock_get:
             mock_get.side_effect = httpx.TimeoutException("Request timeout")
 
-            # Act
-            result = await auth_client.verify_token(token)
-
-            # Assert
-            assert result is None
+            with pytest.raises(AINativeTimeoutError):
+                await auth_client.verify_token(token)
 
     @pytest.mark.asyncio
     async def test_verify_api_key_success(self, auth_client):
@@ -150,38 +139,32 @@ class TestAINativeAuthClient:
             mock_get.assert_called_once_with("/v1/auth/me", headers={"X-API-Key": api_key})
 
     @pytest.mark.asyncio
-    async def test_verify_api_key_invalid_returns_none(self, auth_client):
-        """Test that invalid API key returns None"""
-        # Arrange
+    async def test_verify_api_key_invalid_raises_error(self, auth_client):
+        """Test that invalid API key raises InvalidAPIKeyError"""
+        from integrations.ainative.exceptions import InvalidAPIKeyError
+
         api_key = "invalid_api_key"
 
-        # Mock 401 response
         with patch.object(auth_client.client, "get", new_callable=AsyncMock) as mock_get:
             mock_response = MagicMock()
             mock_response.status_code = 401
             mock_get.return_value = mock_response
 
-            # Act
-            result = await auth_client.verify_api_key(api_key)
-
-            # Assert
-            assert result is None
+            with pytest.raises(InvalidAPIKeyError):
+                await auth_client.verify_api_key(api_key)
 
     @pytest.mark.asyncio
-    async def test_verify_api_key_network_error_returns_none(self, auth_client):
-        """Test that network errors return None for API key verification"""
-        # Arrange
+    async def test_verify_api_key_network_error_raises_error(self, auth_client):
+        """Test that network errors raise AINativeConnectionError for API key verification"""
+        from integrations.ainative.exceptions import AINativeConnectionError
+
         api_key = "sk_test_1234567890"
 
-        # Mock network error
         with patch.object(auth_client.client, "get", new_callable=AsyncMock) as mock_get:
-            mock_get.side_effect = Exception("Network error")
+            mock_get.side_effect = httpx.ConnectError("Network error")
 
-            # Act
-            result = await auth_client.verify_api_key(api_key)
-
-            # Assert
-            assert result is None
+            with pytest.raises(AINativeConnectionError):
+                await auth_client.verify_api_key(api_key)
 
     @pytest.mark.asyncio
     async def test_client_initialization_with_custom_url(self):

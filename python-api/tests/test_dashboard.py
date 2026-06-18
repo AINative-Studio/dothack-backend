@@ -6,6 +6,7 @@ Uses TestClient for integration testing with mocked dependencies.
 """
 
 import uuid
+from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -18,6 +19,12 @@ from integrations.zerodb.exceptions import ZeroDBError, ZeroDBNotFound
 # Create test app with dashboard router
 app = FastAPI()
 app.include_router(router)
+
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request, exc):
+    from fastapi.responses import JSONResponse
+    return JSONResponse(status_code=500, content={"detail": str(exc)})
 
 
 @pytest.fixture
@@ -72,7 +79,7 @@ def organizer_client(mock_organizer_user, mock_zerodb_client):
     app.dependency_overrides[get_current_user] = override_get_current_user
     app.dependency_overrides[get_zerodb_client] = override_get_zerodb_client
 
-    yield TestClient(app)
+    yield TestClient(app, raise_server_exceptions=False)
 
     # Clean up
     app.dependency_overrides.clear()
@@ -91,7 +98,7 @@ def builder_client(mock_builder_user, mock_zerodb_client):
     app.dependency_overrides[get_current_user] = override_get_current_user
     app.dependency_overrides[get_zerodb_client] = override_get_zerodb_client
 
-    yield TestClient(app)
+    yield TestClient(app, raise_server_exceptions=False)
 
     # Clean up
     app.dependency_overrides.clear()
@@ -110,7 +117,7 @@ def judge_client(mock_judge_user, mock_zerodb_client):
     app.dependency_overrides[get_current_user] = override_get_current_user
     app.dependency_overrides[get_zerodb_client] = override_get_zerodb_client
 
-    yield TestClient(app)
+    yield TestClient(app, raise_server_exceptions=False)
 
     # Clean up
     app.dependency_overrides.clear()
@@ -124,72 +131,57 @@ class TestOrganizerDashboardEndpoint:
         self, mock_get_dashboard, organizer_client, mock_organizer_user
     ):
         """Should return organizer dashboard with statistics"""
-        # Arrange
         hackathon_id = str(uuid.uuid4())
+        now = datetime.utcnow().isoformat()
 
         mock_get_dashboard.return_value = {
-            "hackathons": [
+            "my_hackathons": [
                 {
                     "hackathon_id": hackathon_id,
                     "name": "Test Hackathon",
                     "status": "ACTIVE",
+                    "start_date": now,
+                    "end_date": now,
                     "participant_count": 50,
                     "team_count": 10,
                     "submission_count": 8,
                 }
             ],
-            "total_hackathons": 1,
             "total_participants": 50,
             "total_teams": 10,
             "total_submissions": 8,
             "pending_judgments": 8,
-            "recent_activity": [
-                {
-                    "activity_type": "submission",
-                    "description": "New submission received",
-                    "timestamp": "2024-01-01T12:00:00",
-                }
-            ],
         }
 
-        # Act
         response = organizer_client.get("/api/v1/dashboard/organizer")
 
-        # Assert
         assert response.status_code == 200
         data = response.json()
-        assert data["total_hackathons"] == 1
         assert data["total_participants"] == 50
         assert data["total_teams"] == 10
         assert data["total_submissions"] == 8
         assert data["pending_judgments"] == 8
-        assert len(data["hackathons"]) == 1
-        assert len(data["recent_activity"]) == 1
+        assert len(data["my_hackathons"]) == 1
 
     @patch("api.routes.dashboard.dashboard_service.get_organizer_dashboard")
     def test_get_organizer_dashboard_empty(
         self, mock_get_dashboard, organizer_client
     ):
         """Should return empty dashboard when no hackathons organized"""
-        # Arrange
         mock_get_dashboard.return_value = {
-            "hackathons": [],
-            "total_hackathons": 0,
+            "my_hackathons": [],
             "total_participants": 0,
             "total_teams": 0,
             "total_submissions": 0,
             "pending_judgments": 0,
-            "recent_activity": [],
         }
 
-        # Act
         response = organizer_client.get("/api/v1/dashboard/organizer")
 
-        # Assert
         assert response.status_code == 200
         data = response.json()
-        assert data["total_hackathons"] == 0
-        assert len(data["hackathons"]) == 0
+        assert data["total_participants"] == 0
+        assert len(data["my_hackathons"]) == 0
 
 
 class TestBuilderDashboardEndpoint:
@@ -200,9 +192,10 @@ class TestBuilderDashboardEndpoint:
         self, mock_get_dashboard, builder_client, mock_builder_user
     ):
         """Should return builder dashboard with participation info"""
-        # Arrange
         hackathon_id = str(uuid.uuid4())
         team_id = str(uuid.uuid4())
+        now = datetime.utcnow().isoformat()
+        future = (datetime.utcnow() + timedelta(days=30)).isoformat()
 
         mock_get_dashboard.return_value = {
             "registered_hackathons": [
@@ -210,64 +203,72 @@ class TestBuilderDashboardEndpoint:
                     "hackathon_id": hackathon_id,
                     "name": "Test Hackathon",
                     "status": "ACTIVE",
-                    "registration_date": "2024-01-01T00:00:00",
+                    "start_date": now,
+                    "end_date": future,
+                    "location": "San Francisco",
+                    "my_role": "builder",
                 }
             ],
-            "teams": [
+            "my_teams": [
                 {
                     "team_id": team_id,
                     "name": "My Team",
                     "hackathon_id": hackathon_id,
-                    "role": "MEMBER",
+                    "hackathon_name": "Test Hackathon",
+                    "status": "ACTIVE",
+                    "member_count": 3,
+                    "my_role": "MEMBER",
                 }
             ],
-            "submissions": [
+            "my_submissions": [
                 {
                     "submission_id": str(uuid.uuid4()),
-                    "title": "My Project",
+                    "project_id": str(uuid.uuid4()),
+                    "project_name": "My Project",
                     "team_id": team_id,
+                    "team_name": "My Team",
+                    "hackathon_id": hackathon_id,
+                    "hackathon_name": "Test Hackathon",
+                    "submitted_at": now,
                     "status": "SUBMITTED",
                 }
             ],
             "upcoming_deadlines": [
                 {
+                    "hackathon_id": hackathon_id,
                     "hackathon_name": "Test Hackathon",
                     "deadline_type": "submission",
-                    "deadline": "2024-12-31T23:59:59",
+                    "deadline": future,
+                    "days_remaining": 30,
                 }
             ],
         }
 
-        # Act
         response = builder_client.get("/api/v1/dashboard/builder")
 
-        # Assert
         assert response.status_code == 200
         data = response.json()
         assert len(data["registered_hackathons"]) == 1
-        assert len(data["teams"]) == 1
-        assert len(data["submissions"]) == 1
+        assert len(data["my_teams"]) == 1
+        assert len(data["my_submissions"]) == 1
         assert len(data["upcoming_deadlines"]) == 1
 
     @patch("api.routes.dashboard.dashboard_service.get_builder_dashboard")
     def test_get_builder_dashboard_empty(self, mock_get_dashboard, builder_client):
         """Should return empty dashboard when no participation"""
-        # Arrange
         mock_get_dashboard.return_value = {
             "registered_hackathons": [],
-            "teams": [],
-            "submissions": [],
+            "my_teams": [],
+            "my_submissions": [],
             "upcoming_deadlines": [],
         }
 
-        # Act
         response = builder_client.get("/api/v1/dashboard/builder")
 
-        # Assert
         assert response.status_code == 200
         data = response.json()
         assert len(data["registered_hackathons"]) == 0
-        assert len(data["teams"]) == 0
+        assert len(data["my_teams"]) == 0
 
 
 class TestJudgeDashboardEndpoint:
@@ -278,8 +279,9 @@ class TestJudgeDashboardEndpoint:
         self, mock_get_dashboard, judge_client, mock_judge_user
     ):
         """Should return judge dashboard with judging assignments"""
-        # Arrange
         hackathon_id = str(uuid.uuid4())
+        now = datetime.utcnow().isoformat()
+        future = (datetime.utcnow() + timedelta(days=30)).isoformat()
 
         mock_get_dashboard.return_value = {
             "assigned_hackathons": [
@@ -287,49 +289,37 @@ class TestJudgeDashboardEndpoint:
                     "hackathon_id": hackathon_id,
                     "name": "Test Hackathon",
                     "status": "ACTIVE",
+                    "start_date": now,
+                    "end_date": future,
+                    "assigned_submissions": 8,
+                    "completed_judgments": 5,
                 }
             ],
-            "submissions_to_judge": [
-                {
-                    "submission_id": str(uuid.uuid4()),
-                    "title": "Project to Judge",
-                    "hackathon_id": hackathon_id,
-                    "status": "PENDING_REVIEW",
-                }
-            ],
+            "submissions_to_judge": 3,
             "completed_judgments": 5,
-            "pending_judgments": 3,
-            "total_assigned": 8,
+            "pending_submissions": [],
         }
 
-        # Act
         response = judge_client.get("/api/v1/dashboard/judge")
 
-        # Assert
         assert response.status_code == 200
         data = response.json()
         assert len(data["assigned_hackathons"]) == 1
-        assert len(data["submissions_to_judge"]) == 1
+        assert data["submissions_to_judge"] == 3
         assert data["completed_judgments"] == 5
-        assert data["pending_judgments"] == 3
-        assert data["total_assigned"] == 8
 
     @patch("api.routes.dashboard.dashboard_service.get_judge_dashboard")
     def test_get_judge_dashboard_empty(self, mock_get_dashboard, judge_client):
         """Should return empty dashboard when no assignments"""
-        # Arrange
         mock_get_dashboard.return_value = {
             "assigned_hackathons": [],
-            "submissions_to_judge": [],
+            "submissions_to_judge": 0,
             "completed_judgments": 0,
-            "pending_judgments": 0,
-            "total_assigned": 0,
+            "pending_submissions": [],
         }
 
-        # Act
         response = judge_client.get("/api/v1/dashboard/judge")
 
-        # Assert
         assert response.status_code == 200
         data = response.json()
         assert len(data["assigned_hackathons"]) == 0
@@ -344,64 +334,56 @@ class TestHackathonOverviewEndpoint:
         self, mock_get_overview, organizer_client, mock_organizer_user
     ):
         """Should return comprehensive hackathon overview"""
-        # Arrange
         hackathon_id = str(uuid.uuid4())
+        now = datetime.utcnow().isoformat()
+        future = (datetime.utcnow() + timedelta(days=30)).isoformat()
 
         mock_get_overview.return_value = {
-            "hackathon": {
-                "hackathon_id": hackathon_id,
-                "name": "Test Hackathon",
-                "status": "ACTIVE",
-                "start_date": "2024-01-01T00:00:00",
-                "end_date": "2024-12-31T23:59:59",
-            },
-            "statistics": {
+            "hackathon_id": hackathon_id,
+            "name": "Test Hackathon",
+            "status": "ACTIVE",
+            "start_date": now,
+            "end_date": future,
+            "location": "San Francisco",
+            "stats": {
                 "participant_count": 50,
                 "team_count": 10,
                 "submission_count": 8,
+                "builder_count": 40,
                 "judge_count": 3,
+                "track_distribution": {"AI/ML": 5, "Web3": 5},
             },
-            "track_distribution": [
-                {"track_name": "AI/ML", "team_count": 5},
-                {"track_name": "Web3", "team_count": 5},
-            ],
             "recent_activity": [
                 {
                     "activity_type": "submission",
                     "description": "New submission",
-                    "timestamp": "2024-01-01T12:00:00",
+                    "timestamp": now,
                 }
             ],
         }
 
-        # Act
         response = organizer_client.get(
             f"/api/v1/dashboard/hackathons/{hackathon_id}"
         )
 
-        # Assert
         assert response.status_code == 200
         data = response.json()
-        assert data["hackathon"]["hackathon_id"] == hackathon_id
-        assert data["statistics"]["participant_count"] == 50
-        assert data["statistics"]["team_count"] == 10
-        assert len(data["track_distribution"]) == 2
+        assert data["hackathon_id"] == hackathon_id
+        assert data["stats"]["participant_count"] == 50
+        assert data["stats"]["team_count"] == 10
 
     @patch("api.routes.dashboard.dashboard_service.get_hackathon_overview")
     def test_get_hackathon_overview_not_found(
         self, mock_get_overview, organizer_client
     ):
-        """Should return 404 when hackathon not found"""
-        # Arrange
+        """Should return 500 when hackathon not found (ZeroDBNotFound propagates)"""
         hackathon_id = str(uuid.uuid4())
         mock_get_overview.side_effect = ZeroDBNotFound("Hackathon not found")
 
-        # Act
         response = organizer_client.get(
             f"/api/v1/dashboard/hackathons/{hackathon_id}"
         )
 
-        # Assert
         assert response.status_code == 500
 
     @patch("api.routes.dashboard.dashboard_service.get_hackathon_overview")
@@ -409,14 +391,11 @@ class TestHackathonOverviewEndpoint:
         self, mock_get_overview, builder_client
     ):
         """Should prevent non-organizers from accessing overview"""
-        # Arrange
         hackathon_id = str(uuid.uuid4())
         mock_get_overview.side_effect = ZeroDBError("Unauthorized")
 
-        # Act
         response = builder_client.get(
             f"/api/v1/dashboard/hackathons/{hackathon_id}"
         )
 
-        # Assert
         assert response.status_code == 500

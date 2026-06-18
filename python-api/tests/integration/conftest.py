@@ -56,17 +56,30 @@ from integrations.zerodb.client import ZeroDBClient
 
 
 @pytest.fixture
-def client() -> TestClient:
+def client(test_user) -> TestClient:
     """
-    Create FastAPI test client.
+    Create FastAPI test client with auth dependency overridden.
+
+    Uses FastAPI's dependency_overrides to properly bypass authentication.
+    This is the correct way to mock auth - patching the module attribute
+    does NOT work because Depends() captures the function object at route
+    definition time.
 
     Returns:
-        TestClient instance for making HTTP requests
+        TestClient instance with auth overridden
     """
     # Import app lazily to avoid circular dependencies
     from main import app
+    from api.dependencies import get_current_user
 
-    return TestClient(app)
+    async def override_get_current_user():
+        return test_user
+
+    app.dependency_overrides[get_current_user] = override_get_current_user
+
+    yield TestClient(app)
+
+    app.dependency_overrides.pop(get_current_user, None)
 
 
 class AuthenticatedClient:
@@ -403,40 +416,58 @@ def mock_zerodb_client():
 @pytest.fixture
 def mock_auth(test_user: Dict[str, Any]):
     """
-    Mock authentication dependency.
+    Mock authentication dependency using FastAPI dependency overrides.
 
     Returns:
-        Patch context manager for get_current_user
+        The mock user dict
     """
-    with patch("api.dependencies.get_current_user") as mock:
-        mock.return_value = test_user
-        yield mock
+    from main import app
+    from api.dependencies import get_current_user
+
+    async def override():
+        return test_user
+
+    app.dependency_overrides[get_current_user] = override
+    yield test_user
+    app.dependency_overrides.pop(get_current_user, None)
 
 
 @pytest.fixture
 def mock_auth_organizer(test_organizer: Dict[str, Any]):
     """
-    Mock authentication for organizer.
+    Mock authentication for organizer using FastAPI dependency overrides.
 
     Returns:
-        Patch context manager for get_current_user (organizer)
+        The organizer user dict
     """
-    with patch("api.dependencies.get_current_user") as mock:
-        mock.return_value = test_organizer
-        yield mock
+    from main import app
+    from api.dependencies import get_current_user
+
+    async def override():
+        return test_organizer
+
+    app.dependency_overrides[get_current_user] = override
+    yield test_organizer
+    app.dependency_overrides.pop(get_current_user, None)
 
 
 @pytest.fixture
 def mock_auth_judge(test_judge: Dict[str, Any]):
     """
-    Mock authentication for judge.
+    Mock authentication for judge using FastAPI dependency overrides.
 
     Returns:
-        Patch context manager for get_current_user (judge)
+        The judge user dict
     """
-    with patch("api.dependencies.get_current_user") as mock:
-        mock.return_value = test_judge
-        yield mock
+    from main import app
+    from api.dependencies import get_current_user
+
+    async def override():
+        return test_judge
+
+    app.dependency_overrides[get_current_user] = override
+    yield test_judge
+    app.dependency_overrides.pop(get_current_user, None)
 
 
 # ============================================================================

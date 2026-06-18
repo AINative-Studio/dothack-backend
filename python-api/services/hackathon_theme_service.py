@@ -35,14 +35,14 @@ async def get_theme_by_name(
         Theme dict if found, None otherwise
     """
     try:
-        response = await zerodb.tables.query_rows(
-            table_id="hackathon_themes",
+        rows = await zerodb.tables.query_rows(
+            "hackathon_themes",
             filter={"theme_name": theme_name},
             limit=1
         )
 
-        if response and response.get("rows"):
-            theme = response["rows"][0]
+        if rows:
+            theme = rows[0]
             if exclude_id and theme.get("id") == exclude_id:
                 return None
             return theme
@@ -67,18 +67,18 @@ async def get_next_display_order(zerodb: ZeroDBClient) -> int:
         Next display order number
     """
     try:
-        response = await zerodb.tables.query_rows(
-            table_id="hackathon_themes",
+        rows = await zerodb.tables.query_rows(
+            "hackathon_themes",
             filter={},
             limit=1000  # Get all themes
         )
 
-        if not response or not response.get("rows"):
+        if not rows:
             return 1
 
         # Find max display_order
         max_order = max(
-            (theme.get("display_order", 0) for theme in response["rows"]),
+            (theme.get("display_order", 0) for theme in rows),
             default=0
         )
         return max_order + 1
@@ -170,19 +170,19 @@ async def get_theme(theme_id: str, zerodb: ZeroDBClient) -> Dict:
         HTTPException: If theme not found or database error
     """
     try:
-        response = await zerodb.tables.query_rows(
-            table_id="hackathon_themes",
+        rows = await zerodb.tables.query_rows(
+            "hackathon_themes",
             filter={"id": theme_id},
             limit=1
         )
 
-        if not response or not response.get("rows"):
+        if not rows:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Theme {theme_id} not found"
             )
 
-        return response["rows"][0]
+        return rows[0]
 
     except HTTPException:
         raise
@@ -208,13 +208,11 @@ async def list_themes(zerodb: ZeroDBClient) -> Dict:
         HTTPException: If database error occurs
     """
     try:
-        response = await zerodb.tables.query_rows(
-            table_id="hackathon_themes",
+        themes = await zerodb.tables.query_rows(
+            "hackathon_themes",
             filter={},
             limit=1000
         )
-
-        themes = response.get("rows", [])
 
         # Sort by display_order
         themes.sort(key=lambda x: x.get("display_order", 999))
@@ -361,13 +359,11 @@ async def refresh_theme_statistics(theme_id: str, zerodb: ZeroDBClient) -> Dict:
 
     try:
         # Query hackathons with this theme
-        response = await zerodb.tables.query_rows(
-            table_id="hackathons",
+        hackathons = await zerodb.tables.query_rows(
+            "hackathons",
             filter={"theme_id": theme_id},
             limit=10000
         )
-
-        hackathons = response.get("rows", [])
         hackathon_count = len(hackathons)
 
         # Sum prizes

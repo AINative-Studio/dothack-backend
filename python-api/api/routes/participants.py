@@ -136,7 +136,7 @@ async def list_participants(
     role: Optional[str] = Query(
         None,
         description="Filter by role (BUILDER, ORGANIZER, JUDGE, MENTOR)",
-        regex="^(BUILDER|ORGANIZER|JUDGE|MENTOR)$",
+        pattern="^(BUILDER|ORGANIZER|JUDGE|MENTOR)$",
     ),
     zerodb: ZeroDBClient = Depends(get_zerodb_client),
 ) -> ListParticipantsResponse:

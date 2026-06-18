@@ -2,83 +2,88 @@
 Tests for Search Service
 
 Comprehensive tests for semantic search functionality including:
-- Natural language search
-- Similar submissions search
-- Filtering (hackathon, track, status)
-- Ranking by similarity
+- Universal search (search_all)
+- Hackathon-scoped search (search_hackathon)
+- Filtering (entity_type, status, track)
+- Pagination
 - Performance (< 200ms target)
 - Error handling
 - Edge cases
 """
 
-import uuid
-from datetime import datetime
 from time import time
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, PropertyMock
 
 import pytest
+from fastapi import HTTPException
 from integrations.zerodb.exceptions import (
     ZeroDBError,
     ZeroDBNotFound,
     ZeroDBTimeoutError,
 )
-from services.search_service import (
-    SearchResult,
-    SearchService,
-    quick_search,
-)
+from api.schemas.search import SearchResult, SearchResultMetadata, SearchResponse, HackathonSearchResponse
+from services.search_service import SearchService
 
 
 class TestSearchResult:
-    """Test SearchResult dataclass"""
+    """Test SearchResult Pydantic model"""
 
     def test_search_result_creation(self):
         """Should create SearchResult with all fields"""
         # Arrange & Act
         result = SearchResult(
-            submission_id="sub-123",
-            hackathon_id="hack-456",
-            title="AI Assistant",
-            description="An intelligent coding assistant",
-            similarity_score=0.92,
-            metadata={"track_id": "ai-ml", "status": "SUBMITTED"}
+            id="sub-123",
+            score=0.92,
+            metadata=SearchResultMetadata(
+                entity_type="submission",
+                hackathon_id="hack-456",
+                track_id="ai-ml",
+                status="SUBMITTED",
+                title="AI Assistant",
+                description="An intelligent coding assistant",
+            ),
         )
 
         # Assert
-        assert result.submission_id == "sub-123"
-        assert result.hackathon_id == "hack-456"
-        assert result.title == "AI Assistant"
-        assert result.description == "An intelligent coding assistant"
-        assert result.similarity_score == 0.92
-        assert result.metadata["track_id"] == "ai-ml"
+        assert result.id == "sub-123"
+        assert result.score == 0.92
+        assert result.metadata.entity_type == "submission"
+        assert result.metadata.hackathon_id == "hack-456"
+        assert result.metadata.title == "AI Assistant"
+        assert result.metadata.description == "An intelligent coding assistant"
+        assert result.metadata.track_id == "ai-ml"
+        assert result.metadata.status == "SUBMITTED"
 
     def test_search_result_to_dict(self):
-        """Should convert SearchResult to dictionary"""
+        """Should convert SearchResult to dictionary via model_dump"""
         # Arrange
         result = SearchResult(
-            submission_id="sub-123",
-            hackathon_id="hack-456",
-            title="AI Assistant",
-            description="A helpful tool",
-            similarity_score=0.85,
-            metadata={"track_id": "ai-ml"}
+            id="sub-123",
+            score=0.85,
+            metadata=SearchResultMetadata(
+                entity_type="submission",
+                hackathon_id="hack-456",
+                track_id="ai-ml",
+                title="AI Assistant",
+                description="A helpful tool",
+            ),
         )
 
         # Act
-        result_dict = result.to_dict()
+        result_dict = result.model_dump()
 
         # Assert
-        assert result_dict["submission_id"] == "sub-123"
-        assert result_dict["hackathon_id"] == "hack-456"
-        assert result_dict["title"] == "AI Assistant"
-        assert result_dict["similarity_score"] == 0.85
+        assert result_dict["id"] == "sub-123"
+        assert result_dict["score"] == 0.85
+        assert result_dict["metadata"]["hackathon_id"] == "hack-456"
+        assert result_dict["metadata"]["title"] == "AI Assistant"
 
 
 class TestSearchServiceInitialization:
     """Test SearchService initialization"""
 
-    def test_service_initialization_default_model(self):
-        """Should initialize with default embedding model"""
+    def test_service_initialization(self):
+        """Should initialize with zerodb client"""
         # Arrange
         mock_client = AsyncMock()
 
@@ -86,693 +91,630 @@ class TestSearchServiceInitialization:
         service = SearchService(mock_client)
 
         # Assert
-        assert service.client == mock_client
-        assert service.model == "BAAI/bge-small-en-v1.5"
+        assert service.zerodb == mock_client
 
-    def test_service_initialization_custom_model(self):
-        """Should initialize with custom embedding model"""
+    def test_service_initialization_stores_client(self):
+        """Should store zerodb_client as self.zerodb"""
         # Arrange
         mock_client = AsyncMock()
-        custom_model = "custom-model-v1"
 
         # Act
-        service = SearchService(mock_client, model=custom_model)
+        service = SearchService(mock_client)
 
         # Assert
-        assert service.model == custom_model
+        assert service.zerodb is mock_client
 
 
-class TestSearchByQuery:
-    """Test search_by_query() function"""
+class TestSearchAll:
+    """Test search_all() method"""
 
     @pytest.mark.asyncio
-    async def test_search_by_query_success(self):
+    async def test_search_all_success(self):
         """Should return search results for valid query"""
         # Arrange
         mock_client = AsyncMock()
         service = SearchService(mock_client)
 
-        # Mock embedding generation
-        mock_client.embeddings.generate.return_value = {
-            "embedding": [0.1] * 384,  # 384-dimensional embedding
-            "model": "BAAI/bge-small-en-v1.5"
-        }
-
-        # Mock vector search results
-        mock_client.vectors.search.return_value = [
+        # Mock embeddings.search results
+        mock_client.embeddings.search.return_value = [
             {
-                "vector_id": "sub-123",
-                "similarity": 0.92,
+                "id": "sub-123",
+                "score": 0.92,
                 "metadata": {
-                    "submission_id": "sub-123",
+                    "entity_type": "submission",
                     "hackathon_id": "hack-456",
-                    "project_name": "AI Healthcare",
+                    "title": "AI Healthcare",
                     "description": "AI-powered healthcare solution",
                     "track_id": "ai-ml",
-                    "status": "SUBMITTED"
-                }
+                    "status": "SUBMITTED",
+                },
             },
             {
-                "vector_id": "sub-456",
-                "similarity": 0.85,
+                "id": "sub-456",
+                "score": 0.85,
                 "metadata": {
-                    "submission_id": "sub-456",
+                    "entity_type": "submission",
                     "hackathon_id": "hack-456",
-                    "project_name": "Medical AI",
+                    "title": "Medical AI",
                     "description": "AI for medical diagnosis",
                     "track_id": "ai-ml",
-                    "status": "SUBMITTED"
-                }
-            }
+                    "status": "SUBMITTED",
+                },
+            },
         ]
 
         # Act
-        results = await service.search_by_query(
+        result = await service.search_all(
             query="AI healthcare solutions",
-            hackathon_id="hack-456",
-            top_k=10
+            limit=10,
         )
 
         # Assert
-        assert len(results) == 2
-        assert results[0].submission_id == "sub-123"
-        assert results[0].similarity_score == 0.92
-        assert results[0].title == "AI Healthcare"
-        assert results[1].submission_id == "sub-456"
-        assert results[1].similarity_score == 0.85
+        assert len(result["results"]) == 2
+        assert result["results"][0]["id"] == "sub-123"
+        assert result["results"][0]["score"] == 0.92
+        assert result["results"][1]["id"] == "sub-456"
+        assert result["results"][1]["score"] == 0.85
+        assert result["total_results"] == 2
+        assert "execution_time_ms" in result
 
-        # Verify embedding was generated
-        mock_client.embeddings.generate.assert_called_once_with(
-            text="AI healthcare solutions",
-            model="BAAI/bge-small-en-v1.5"
-        )
-
-        # Verify vector search was called
-        mock_client.vectors.search.assert_called_once()
+        # Verify embeddings.search was called
+        mock_client.embeddings.search.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_search_by_query_with_filters(self):
-        """Should apply filters to search"""
+    async def test_search_all_with_entity_type_filter(self):
+        """Should apply entity_type filter to search"""
         # Arrange
         mock_client = AsyncMock()
         service = SearchService(mock_client)
-
-        mock_client.embeddings.generate.return_value = {
-            "embedding": [0.1] * 384
-        }
-        mock_client.vectors.search.return_value = []
-
-        filters = {"track_id": "ai-ml", "status": "SUBMITTED"}
+        mock_client.embeddings.search.return_value = []
 
         # Act
-        await service.search_by_query(
+        await service.search_all(
             query="test query",
-            hackathon_id="hack-123",
-            top_k=10,
-            filters=filters
+            entity_type="submission",
+            limit=10,
         )
 
         # Assert
-        call_args = mock_client.vectors.search.call_args
-        assert call_args.kwargs["filter"]["track_id"] == "ai-ml"
-        assert call_args.kwargs["filter"]["status"] == "SUBMITTED"
-        assert call_args.kwargs["filter"]["hackathon_id"] == "hack-123"
+        call_args = mock_client.embeddings.search.call_args
+        assert call_args.kwargs["filter"]["entity_type"] == "submission"
 
     @pytest.mark.asyncio
-    async def test_search_by_query_with_min_similarity(self):
-        """Should respect minimum similarity threshold"""
+    async def test_search_all_with_status_filter(self):
+        """Should apply status filter to search"""
         # Arrange
         mock_client = AsyncMock()
         service = SearchService(mock_client)
-
-        mock_client.embeddings.generate.return_value = {
-            "embedding": [0.1] * 384
-        }
-        mock_client.vectors.search.return_value = []
+        mock_client.embeddings.search.return_value = []
 
         # Act
-        await service.search_by_query(
-            query="test",
-            hackathon_id="hack-123",
-            min_similarity=0.7
+        await service.search_all(
+            query="test query",
+            status="SUBMITTED",
+            limit=10,
         )
 
         # Assert
-        call_args = mock_client.vectors.search.call_args
+        call_args = mock_client.embeddings.search.call_args
+        assert call_args.kwargs["filter"]["status"] == "SUBMITTED"
+
+    @pytest.mark.asyncio
+    async def test_search_all_with_similarity_threshold(self):
+        """Should pass similarity_threshold to search"""
+        # Arrange
+        mock_client = AsyncMock()
+        service = SearchService(mock_client)
+        mock_client.embeddings.search.return_value = []
+
+        # Act
+        await service.search_all(
+            query="test",
+            similarity_threshold=0.7,
+        )
+
+        # Assert
+        call_args = mock_client.embeddings.search.call_args
         assert call_args.kwargs["similarity_threshold"] == 0.7
 
     @pytest.mark.asyncio
-    async def test_search_by_query_empty_query_raises_error(self):
-        """Should raise ValueError for empty query"""
+    async def test_search_all_no_filters(self):
+        """Should pass None filter when no entity_type or status"""
         # Arrange
         mock_client = AsyncMock()
         service = SearchService(mock_client)
+        mock_client.embeddings.search.return_value = []
 
-        # Act & Assert
-        with pytest.raises(ValueError) as exc_info:
-            await service.search_by_query(
-                query="",
-                hackathon_id="hack-123"
-            )
-        assert "query cannot be empty" in str(exc_info.value).lower()
+        # Act
+        await service.search_all(query="test")
+
+        # Assert
+        call_args = mock_client.embeddings.search.call_args
+        assert call_args.kwargs["filter"] is None
 
     @pytest.mark.asyncio
-    async def test_search_by_query_invalid_top_k_raises_error(self):
-        """Should raise ValueError for invalid top_k"""
+    async def test_search_all_handles_timeout(self):
+        """Should raise HTTPException 504 on timeout"""
         # Arrange
         mock_client = AsyncMock()
         service = SearchService(mock_client)
 
-        # Act & Assert - top_k too small
-        with pytest.raises(ValueError) as exc_info:
-            await service.search_by_query(
-                query="test",
-                hackathon_id="hack-123",
-                top_k=0
-            )
-        assert "top_k" in str(exc_info.value).lower()
-
-        # Act & Assert - top_k too large
-        with pytest.raises(ValueError) as exc_info:
-            await service.search_by_query(
-                query="test",
-                hackathon_id="hack-123",
-                top_k=100
-            )
-        assert "top_k" in str(exc_info.value).lower()
-
-    @pytest.mark.asyncio
-    async def test_search_by_query_invalid_similarity_raises_error(self):
-        """Should raise ValueError for invalid min_similarity"""
-        # Arrange
-        mock_client = AsyncMock()
-        service = SearchService(mock_client)
-
-        # Act & Assert - negative similarity
-        with pytest.raises(ValueError) as exc_info:
-            await service.search_by_query(
-                query="test",
-                hackathon_id="hack-123",
-                min_similarity=-0.1
-            )
-        assert "similarity" in str(exc_info.value).lower()
-
-        # Act & Assert - similarity > 1.0
-        with pytest.raises(ValueError) as exc_info:
-            await service.search_by_query(
-                query="test",
-                hackathon_id="hack-123",
-                min_similarity=1.5
-            )
-        assert "similarity" in str(exc_info.value).lower()
-
-    @pytest.mark.asyncio
-    async def test_search_by_query_handles_timeout(self):
-        """Should handle timeout errors gracefully"""
-        # Arrange
-        mock_client = AsyncMock()
-        service = SearchService(mock_client)
-
-        mock_client.embeddings.generate.side_effect = ZeroDBTimeoutError(
+        mock_client.embeddings.search.side_effect = ZeroDBTimeoutError(
             "Request timed out"
         )
 
         # Act & Assert
-        with pytest.raises(ZeroDBError) as exc_info:
-            await service.search_by_query(
-                query="test",
-                hackathon_id="hack-123"
-            )
-        assert "timed out" in str(exc_info.value).lower()
+        with pytest.raises(HTTPException) as exc_info:
+            await service.search_all(query="test")
+        assert exc_info.value.status_code == 504
 
     @pytest.mark.asyncio
-    async def test_search_by_query_handles_zerodb_error(self):
-        """Should propagate ZeroDB errors"""
+    async def test_search_all_handles_zerodb_error(self):
+        """Should raise HTTPException 500 on ZeroDBError"""
         # Arrange
         mock_client = AsyncMock()
         service = SearchService(mock_client)
 
-        mock_client.embeddings.generate.side_effect = ZeroDBError(
-            "API error"
-        )
+        mock_client.embeddings.search.side_effect = ZeroDBError("API error")
 
         # Act & Assert
-        with pytest.raises(ZeroDBError):
-            await service.search_by_query(
-                query="test",
-                hackathon_id="hack-123"
-            )
+        with pytest.raises(HTTPException) as exc_info:
+            await service.search_all(query="test")
+        assert exc_info.value.status_code == 500
 
     @pytest.mark.asyncio
-    async def test_search_by_query_performance(self):
+    async def test_search_all_performance(self):
         """Should complete search in under 200ms (target)"""
         # Arrange
         mock_client = AsyncMock()
         service = SearchService(mock_client)
 
-        # Simulate fast responses
-        mock_client.embeddings.generate.return_value = {
-            "embedding": [0.1] * 384
-        }
-        mock_client.vectors.search.return_value = [
+        mock_client.embeddings.search.return_value = [
             {
-                "vector_id": "sub-1",
-                "similarity": 0.9,
+                "id": "sub-1",
+                "score": 0.9,
                 "metadata": {
-                    "submission_id": "sub-1",
+                    "entity_type": "submission",
                     "hackathon_id": "hack-1",
-                    "project_name": "Test",
-                    "description": "Test project"
-                }
+                    "title": "Test",
+                    "description": "Test project",
+                },
             }
         ]
 
         # Act
         start = time()
-        await service.search_by_query(
-            query="test query",
-            hackathon_id="hack-123"
-        )
-        elapsed = (time() - start) * 1000  # Convert to ms
+        await service.search_all(query="test query")
+        elapsed = (time() - start) * 1000
 
         # Assert (allow for some overhead in mock calls)
         assert elapsed < 200, f"Search took {elapsed}ms (target: <200ms)"
 
+    @pytest.mark.asyncio
+    async def test_search_all_returns_dicts(self):
+        """Should return dict with results list"""
+        # Arrange
+        mock_client = AsyncMock()
+        mock_client.embeddings.search.return_value = [
+            {
+                "id": "sub-123",
+                "score": 0.9,
+                "metadata": {
+                    "entity_type": "submission",
+                    "hackathon_id": "hack-456",
+                    "title": "Test Project",
+                    "description": "A test",
+                },
+            }
+        ]
+        service = SearchService(mock_client)
 
-class TestFindSimilarSubmissions:
-    """Test find_similar_submissions() function"""
+        # Act
+        result = await service.search_all(query="test", limit=10)
+
+        # Assert
+        assert len(result["results"]) == 1
+        assert isinstance(result["results"][0], dict)
+        assert result["results"][0]["id"] == "sub-123"
+        assert result["results"][0]["score"] == 0.9
+
+
+class TestSearchHackathon:
+    """Test search_hackathon() method"""
 
     @pytest.mark.asyncio
-    async def test_find_similar_success(self):
-        """Should find similar submissions successfully"""
+    async def test_search_hackathon_success(self):
+        """Should return search results scoped to a hackathon"""
         # Arrange
         mock_client = AsyncMock()
         service = SearchService(mock_client)
 
-        # Mock vector.get for reference submission
-        mock_client.vectors.get.return_value = {
-            "vector_id": "sub-123",
-            "embedding": [0.5] * 384,
-            "metadata": {
-                "submission_id": "sub-123",
-                "project_name": "Original Project"
-            }
-        }
+        # Mock hackathon existence check
+        mock_client.tables.query_rows.return_value = [
+            {"hackathon_id": "hack-456", "name": "Test Hackathon"}
+        ]
 
-        # Mock vector search results (includes self + similar)
-        mock_client.vectors.search.return_value = [
+        # Mock embeddings.search results
+        mock_client.embeddings.search.return_value = [
             {
-                "vector_id": "sub-123",
-                "similarity": 1.0,  # Perfect match (self)
+                "id": "sub-123",
+                "score": 0.92,
                 "metadata": {
-                    "submission_id": "sub-123",
+                    "entity_type": "submission",
                     "hackathon_id": "hack-456",
-                    "project_name": "Original Project",
-                    "description": "Original"
-                }
+                    "title": "AI Healthcare",
+                    "description": "AI-powered healthcare solution",
+                },
             },
             {
-                "vector_id": "sub-456",
-                "similarity": 0.88,
+                "id": "sub-456",
+                "score": 0.85,
                 "metadata": {
-                    "submission_id": "sub-456",
+                    "entity_type": "submission",
                     "hackathon_id": "hack-456",
-                    "project_name": "Similar Project 1",
-                    "description": "Very similar"
-                }
+                    "title": "Medical AI",
+                    "description": "AI for medical diagnosis",
+                },
             },
-            {
-                "vector_id": "sub-789",
-                "similarity": 0.75,
-                "metadata": {
-                    "submission_id": "sub-789",
-                    "hackathon_id": "hack-456",
-                    "project_name": "Similar Project 2",
-                    "description": "Somewhat similar"
-                }
-            }
         ]
 
         # Act
-        results = await service.find_similar_submissions(
-            submission_id="sub-123",
+        result = await service.search_hackathon(
             hackathon_id="hack-456",
-            top_k=10
-        )
-
-        # Assert - should exclude the reference submission
-        assert len(results) == 2
-        assert results[0].submission_id == "sub-456"
-        assert results[0].similarity_score == 0.88
-        assert results[1].submission_id == "sub-789"
-        assert results[1].similarity_score == 0.75
-
-        # Verify get was called
-        mock_client.vectors.get.assert_called_once_with(
-            vector_id="sub-123",
-            namespace="hackathons/hack-456/submissions"
-        )
-
-    @pytest.mark.asyncio
-    async def test_find_similar_with_filters(self):
-        """Should apply filters when finding similar submissions"""
-        # Arrange
-        mock_client = AsyncMock()
-        service = SearchService(mock_client)
-
-        mock_client.vectors.get.return_value = {
-            "embedding": [0.5] * 384
-        }
-        mock_client.vectors.search.return_value = []
-
-        filters = {"track_id": "blockchain", "status": "SUBMITTED"}
-
-        # Act
-        await service.find_similar_submissions(
-            submission_id="sub-123",
-            hackathon_id="hack-456",
-            filters=filters
+            query="AI healthcare solutions",
+            limit=10,
         )
 
         # Assert
-        call_args = mock_client.vectors.search.call_args
-        assert call_args.kwargs["filter"]["track_id"] == "blockchain"
+        assert len(result["results"]) == 2
+        assert result["results"][0]["id"] == "sub-123"
+        assert result["results"][0]["score"] == 0.92
+        assert result["results"][1]["id"] == "sub-456"
+        assert result["results"][1]["score"] == 0.85
+        assert result["hackathon_id"] == "hack-456"
+        assert result["total_results"] == 2
+        assert "execution_time_ms" in result
+
+    @pytest.mark.asyncio
+    async def test_search_hackathon_with_entity_type_filter(self):
+        """Should apply entity_type filter"""
+        # Arrange
+        mock_client = AsyncMock()
+        service = SearchService(mock_client)
+        mock_client.tables.query_rows.return_value = [{"hackathon_id": "hack-123"}]
+        mock_client.embeddings.search.return_value = []
+
+        # Act
+        await service.search_hackathon(
+            hackathon_id="hack-123",
+            query="test",
+            entity_type="submission",
+        )
+
+        # Assert
+        call_args = mock_client.embeddings.search.call_args
+        assert call_args.kwargs["filter"]["entity_type"] == "submission"
+        assert call_args.kwargs["filter"]["hackathon_id"] == "hack-123"
+
+    @pytest.mark.asyncio
+    async def test_search_hackathon_with_track_filter(self):
+        """Should apply track_id filter"""
+        # Arrange
+        mock_client = AsyncMock()
+        service = SearchService(mock_client)
+        mock_client.tables.query_rows.return_value = [{"hackathon_id": "hack-123"}]
+        mock_client.embeddings.search.return_value = []
+
+        # Act
+        await service.search_hackathon(
+            hackathon_id="hack-123",
+            query="test",
+            track_id="ai-ml",
+        )
+
+        # Assert
+        call_args = mock_client.embeddings.search.call_args
+        assert call_args.kwargs["filter"]["track_id"] == "ai-ml"
+
+    @pytest.mark.asyncio
+    async def test_search_hackathon_with_status_filter(self):
+        """Should apply status filter"""
+        # Arrange
+        mock_client = AsyncMock()
+        service = SearchService(mock_client)
+        mock_client.tables.query_rows.return_value = [{"hackathon_id": "hack-123"}]
+        mock_client.embeddings.search.return_value = []
+
+        # Act
+        await service.search_hackathon(
+            hackathon_id="hack-123",
+            query="test",
+            status="SUBMITTED",
+        )
+
+        # Assert
+        call_args = mock_client.embeddings.search.call_args
         assert call_args.kwargs["filter"]["status"] == "SUBMITTED"
 
     @pytest.mark.asyncio
-    async def test_find_similar_empty_submission_id_raises_error(self):
-        """Should raise ValueError for empty submission_id"""
+    async def test_search_hackathon_not_found(self):
+        """Should raise HTTPException 404 if hackathon does not exist"""
         # Arrange
         mock_client = AsyncMock()
         service = SearchService(mock_client)
+        mock_client.tables.query_rows.return_value = []  # No hackathon found
 
         # Act & Assert
-        with pytest.raises(ValueError) as exc_info:
-            await service.find_similar_submissions(
-                submission_id="",
-                hackathon_id="hack-123"
+        with pytest.raises(HTTPException) as exc_info:
+            await service.search_hackathon(
+                hackathon_id="nonexistent",
+                query="test",
             )
-        assert "submission_id" in str(exc_info.value).lower()
+        assert exc_info.value.status_code == 404
 
     @pytest.mark.asyncio
-    async def test_find_similar_submission_not_found(self):
-        """Should raise ZeroDBNotFound if reference submission not found"""
+    async def test_search_hackathon_handles_timeout(self):
+        """Should raise HTTPException 504 on timeout"""
         # Arrange
         mock_client = AsyncMock()
         service = SearchService(mock_client)
-
-        mock_client.vectors.get.side_effect = ZeroDBNotFound(
-            "Vector not found"
+        mock_client.tables.query_rows.return_value = [{"hackathon_id": "hack-123"}]
+        mock_client.embeddings.search.side_effect = ZeroDBTimeoutError(
+            "Request timed out"
         )
 
         # Act & Assert
-        with pytest.raises(ZeroDBNotFound):
-            await service.find_similar_submissions(
-                submission_id="nonexistent",
-                hackathon_id="hack-123"
+        with pytest.raises(HTTPException) as exc_info:
+            await service.search_hackathon(
+                hackathon_id="hack-123",
+                query="test",
             )
+        assert exc_info.value.status_code == 504
 
     @pytest.mark.asyncio
-    async def test_find_similar_no_embedding_raises_error(self):
-        """Should raise error if embedding is missing"""
+    async def test_search_hackathon_handles_zerodb_error(self):
+        """Should raise HTTPException 500 on ZeroDBError"""
         # Arrange
         mock_client = AsyncMock()
         service = SearchService(mock_client)
-
-        # Return response without embedding
-        mock_client.vectors.get.return_value = {
-            "vector_id": "sub-123",
-            "metadata": {}
-        }
+        mock_client.tables.query_rows.return_value = [{"hackathon_id": "hack-123"}]
+        mock_client.embeddings.search.side_effect = ZeroDBError("API error")
 
         # Act & Assert
-        with pytest.raises(ZeroDBNotFound) as exc_info:
-            await service.find_similar_submissions(
-                submission_id="sub-123",
-                hackathon_id="hack-456"
+        with pytest.raises(HTTPException) as exc_info:
+            await service.search_hackathon(
+                hackathon_id="hack-123",
+                query="test",
             )
-        assert "embedding not found" in str(exc_info.value).lower()
-
-
-class TestSearchWithPagination:
-    """Test search_with_pagination() function"""
+        assert exc_info.value.status_code == 500
 
     @pytest.mark.asyncio
-    async def test_pagination_first_page(self):
-        """Should return first page of results"""
+    async def test_search_hackathon_uses_scoped_namespace(self):
+        """Should use hackathon-scoped namespace for search"""
+        # Arrange
+        mock_client = AsyncMock()
+        service = SearchService(mock_client)
+        mock_client.tables.query_rows.return_value = [{"hackathon_id": "hack-456"}]
+        mock_client.embeddings.search.return_value = []
+
+        # Act
+        await service.search_hackathon(
+            hackathon_id="hack-456",
+            query="test",
+        )
+
+        # Assert
+        call_args = mock_client.embeddings.search.call_args
+        assert call_args.kwargs["namespace"] == "hackathons/hack-456"
+
+    @pytest.mark.asyncio
+    async def test_search_hackathon_similarity_threshold(self):
+        """Should pass similarity_threshold to search"""
+        # Arrange
+        mock_client = AsyncMock()
+        service = SearchService(mock_client)
+        mock_client.tables.query_rows.return_value = [{"hackathon_id": "hack-123"}]
+        mock_client.embeddings.search.return_value = []
+
+        # Act
+        await service.search_hackathon(
+            hackathon_id="hack-123",
+            query="test",
+            similarity_threshold=0.8,
+        )
+
+        # Assert
+        call_args = mock_client.embeddings.search.call_args
+        assert call_args.kwargs["similarity_threshold"] == 0.8
+
+
+class TestSearchAllPagination:
+    """Test pagination in search_all()"""
+
+    @pytest.mark.asyncio
+    async def test_pagination_with_offset(self):
+        """Should apply offset for pagination"""
         # Arrange
         mock_client = AsyncMock()
         service = SearchService(mock_client)
 
-        mock_client.embeddings.generate.return_value = {
-            "embedding": [0.1] * 384
-        }
-
         # Mock 15 results
-        mock_client.vectors.search.return_value = [
+        mock_client.embeddings.search.return_value = [
             {
-                "vector_id": f"sub-{i}",
-                "similarity": 0.9 - (i * 0.01),
+                "id": f"sub-{i}",
+                "score": 0.9 - (i * 0.01),
                 "metadata": {
-                    "submission_id": f"sub-{i}",
+                    "entity_type": "submission",
                     "hackathon_id": "hack-123",
-                    "project_name": f"Project {i}",
-                    "description": f"Description {i}"
-                }
+                    "title": f"Project {i}",
+                    "description": f"Description {i}",
+                },
             }
             for i in range(15)
         ]
 
-        # Act
-        result = await service.search_with_pagination(
+        # Act - get first page (offset=0, limit=10)
+        result = await service.search_all(
             query="test",
-            hackathon_id="hack-123",
-            page=1,
-            page_size=10
+            limit=10,
+            offset=0,
         )
 
         # Assert
         assert len(result["results"]) == 10
-        assert result["page"] == 1
-        assert result["page_size"] == 10
-        assert result["total"] == 15
-        assert result["has_more"] is True
-        assert result["results"][0].submission_id == "sub-0"
+        assert result["total_results"] == 15
+        assert result["results"][0]["id"] == "sub-0"
 
     @pytest.mark.asyncio
     async def test_pagination_second_page(self):
-        """Should return second page of results"""
+        """Should return second page of results with offset"""
         # Arrange
         mock_client = AsyncMock()
         service = SearchService(mock_client)
 
-        mock_client.embeddings.generate.return_value = {
-            "embedding": [0.1] * 384
-        }
+        # Mock 15 results
+        mock_client.embeddings.search.return_value = [
+            {
+                "id": f"sub-{i}",
+                "score": 0.9 - (i * 0.01),
+                "metadata": {
+                    "entity_type": "submission",
+                    "hackathon_id": "hack-123",
+                    "title": f"Project {i}",
+                    "description": f"Description {i}",
+                },
+            }
+            for i in range(15)
+        ]
+
+        # Act - get second page (offset=10, limit=10)
+        result = await service.search_all(
+            query="test",
+            limit=10,
+            offset=10,
+        )
+
+        # Assert
+        assert len(result["results"]) == 5  # Only 5 results on page 2
+        assert result["results"][0]["id"] == "sub-10"
+
+
+class TestSearchHackathonPagination:
+    """Test pagination in search_hackathon()"""
+
+    @pytest.mark.asyncio
+    async def test_hackathon_search_pagination(self):
+        """Should apply pagination to hackathon search results"""
+        # Arrange
+        mock_client = AsyncMock()
+        service = SearchService(mock_client)
+        mock_client.tables.query_rows.return_value = [{"hackathon_id": "hack-123"}]
 
         # Mock 15 results
-        mock_client.vectors.search.return_value = [
+        mock_client.embeddings.search.return_value = [
             {
-                "vector_id": f"sub-{i}",
-                "similarity": 0.9 - (i * 0.01),
+                "id": f"sub-{i}",
+                "score": 0.9 - (i * 0.01),
                 "metadata": {
-                    "submission_id": f"sub-{i}",
+                    "entity_type": "submission",
                     "hackathon_id": "hack-123",
-                    "project_name": f"Project {i}",
-                    "description": f"Description {i}"
-                }
+                    "title": f"Project {i}",
+                    "description": f"Description {i}",
+                },
             }
             for i in range(15)
         ]
 
         # Act
-        result = await service.search_with_pagination(
-            query="test",
+        result = await service.search_hackathon(
             hackathon_id="hack-123",
-            page=2,
-            page_size=10
-        )
-
-        # Assert
-        assert len(result["results"]) == 5  # Only 5 results on page 2
-        assert result["page"] == 2
-        assert result["has_more"] is False
-        assert result["results"][0].submission_id == "sub-10"
-
-    @pytest.mark.asyncio
-    async def test_pagination_invalid_page_raises_error(self):
-        """Should raise ValueError for invalid page number"""
-        # Arrange
-        mock_client = AsyncMock()
-        service = SearchService(mock_client)
-
-        # Act & Assert
-        with pytest.raises(ValueError) as exc_info:
-            await service.search_with_pagination(
-                query="test",
-                hackathon_id="hack-123",
-                page=0  # Invalid
-            )
-        assert "page" in str(exc_info.value).lower()
-
-    @pytest.mark.asyncio
-    async def test_pagination_invalid_page_size_raises_error(self):
-        """Should raise ValueError for invalid page_size"""
-        # Arrange
-        mock_client = AsyncMock()
-        service = SearchService(mock_client)
-
-        # Act & Assert
-        with pytest.raises(ValueError) as exc_info:
-            await service.search_with_pagination(
-                query="test",
-                hackathon_id="hack-123",
-                page_size=100  # Too large
-            )
-        assert "page_size" in str(exc_info.value).lower()
-
-
-class TestConvertToSearchResults:
-    """Test _convert_to_search_results() helper function"""
-
-    def test_convert_valid_results(self):
-        """Should convert ZeroDB results to SearchResult objects"""
-        # Arrange
-        mock_client = AsyncMock()
-        service = SearchService(mock_client)
-
-        raw_results = [
-            {
-                "vector_id": "sub-123",
-                "similarity": 0.92,
-                "metadata": {
-                    "submission_id": "sub-123",
-                    "hackathon_id": "hack-456",
-                    "project_name": "AI Project",
-                    "description": "An AI solution",
-                    "track_id": "ai-ml"
-                }
-            }
-        ]
-
-        # Act
-        results = service._convert_to_search_results(raw_results)
-
-        # Assert
-        assert len(results) == 1
-        assert isinstance(results[0], SearchResult)
-        assert results[0].submission_id == "sub-123"
-        assert results[0].similarity_score == 0.92
-        assert results[0].title == "AI Project"
-
-    def test_convert_handles_missing_fields(self):
-        """Should handle missing optional fields gracefully"""
-        # Arrange
-        mock_client = AsyncMock()
-        service = SearchService(mock_client)
-
-        raw_results = [
-            {
-                "vector_id": "sub-123",
-                "similarity": 0.85,
-                "metadata": {
-                    "submission_id": "sub-123",
-                    "hackathon_id": "hack-456"
-                    # Missing project_name and description
-                }
-            }
-        ]
-
-        # Act
-        results = service._convert_to_search_results(raw_results)
-
-        # Assert
-        assert len(results) == 1
-        assert results[0].title == ""
-        assert results[0].description == ""
-
-
-class TestGenerateQueryEmbedding:
-    """Test _generate_query_embedding() helper function"""
-
-    @pytest.mark.asyncio
-    async def test_generate_embedding_success(self):
-        """Should generate embedding for query"""
-        # Arrange
-        mock_client = AsyncMock()
-        service = SearchService(mock_client)
-
-        mock_client.embeddings.generate.return_value = {
-            "embedding": [0.1, 0.2, 0.3],
-            "model": "BAAI/bge-small-en-v1.5"
-        }
-
-        # Act
-        embedding = await service._generate_query_embedding("test query")
-
-        # Assert
-        assert embedding == [0.1, 0.2, 0.3]
-        mock_client.embeddings.generate.assert_called_once_with(
-            text="test query",
-            model="BAAI/bge-small-en-v1.5"
-        )
-
-    @pytest.mark.asyncio
-    async def test_generate_embedding_missing_field_raises_error(self):
-        """Should raise error if embedding field is missing"""
-        # Arrange
-        mock_client = AsyncMock()
-        service = SearchService(mock_client)
-
-        mock_client.embeddings.generate.return_value = {
-            "model": "test-model"
-            # Missing embedding field
-        }
-
-        # Act & Assert
-        with pytest.raises(ZeroDBError) as exc_info:
-            await service._generate_query_embedding("test")
-        assert "missing 'embedding' field" in str(exc_info.value).lower()
-
-
-class TestQuickSearch:
-    """Test quick_search() convenience function"""
-
-    @pytest.mark.asyncio
-    async def test_quick_search_returns_dicts(self):
-        """Should return list of dictionaries"""
-        # Arrange
-        mock_client = AsyncMock()
-
-        mock_client.embeddings.generate.return_value = {
-            "embedding": [0.1] * 384
-        }
-
-        mock_client.vectors.search.return_value = [
-            {
-                "vector_id": "sub-123",
-                "similarity": 0.9,
-                "metadata": {
-                    "submission_id": "sub-123",
-                    "hackathon_id": "hack-456",
-                    "project_name": "Test Project",
-                    "description": "A test"
-                }
-            }
-        ]
-
-        # Act
-        results = await quick_search(
-            zerodb_client=mock_client,
             query="test",
-            hackathon_id="hack-456"
+            limit=10,
+            offset=0,
         )
 
         # Assert
-        assert len(results) == 1
-        assert isinstance(results[0], dict)
-        assert results[0]["submission_id"] == "sub-123"
-        assert results[0]["similarity_score"] == 0.9
+        assert len(result["results"]) == 10
+        assert result["total_results"] == 15
+        assert result["hackathon_id"] == "hack-123"
+
+
+class TestSearchResultTransformation:
+    """Test result transformation in search methods"""
+
+    @pytest.mark.asyncio
+    async def test_results_transformed_to_dicts(self):
+        """Should transform raw ZeroDB results to dict format"""
+        # Arrange
+        mock_client = AsyncMock()
+        service = SearchService(mock_client)
+
+        mock_client.embeddings.search.return_value = [
+            {
+                "id": "sub-123",
+                "score": 0.92,
+                "metadata": {
+                    "entity_type": "submission",
+                    "hackathon_id": "hack-456",
+                    "title": "AI Project",
+                    "description": "An AI solution",
+                    "track_id": "ai-ml",
+                },
+            }
+        ]
+
+        # Act
+        result = await service.search_all(query="test")
+
+        # Assert
+        assert len(result["results"]) == 1
+        assert isinstance(result["results"][0], dict)
+        assert result["results"][0]["id"] == "sub-123"
+        assert result["results"][0]["score"] == 0.92
+        assert result["results"][0]["metadata"]["entity_type"] == "submission"
+
+    @pytest.mark.asyncio
+    async def test_results_handle_missing_metadata(self):
+        """Should handle results with empty metadata"""
+        # Arrange
+        mock_client = AsyncMock()
+        service = SearchService(mock_client)
+
+        mock_client.embeddings.search.return_value = [
+            {
+                "id": "sub-123",
+                "score": 0.85,
+                # Missing metadata key
+            }
+        ]
+
+        # Act
+        result = await service.search_all(query="test")
+
+        # Assert
+        assert len(result["results"]) == 1
+        assert result["results"][0]["metadata"] == {}
+
+    @pytest.mark.asyncio
+    async def test_results_handle_missing_score(self):
+        """Should default score to 0.0 when missing"""
+        # Arrange
+        mock_client = AsyncMock()
+        service = SearchService(mock_client)
+
+        mock_client.embeddings.search.return_value = [
+            {
+                "id": "sub-123",
+                # Missing score
+                "metadata": {"entity_type": "submission"},
+            }
+        ]
+
+        # Act
+        result = await service.search_all(query="test")
+
+        # Assert
+        assert result["results"][0]["score"] == 0.0
 
 
 class TestEdgeCases:
@@ -784,20 +726,14 @@ class TestEdgeCases:
         # Arrange
         mock_client = AsyncMock()
         service = SearchService(mock_client)
-
-        mock_client.embeddings.generate.return_value = {
-            "embedding": [0.1] * 384
-        }
-        mock_client.vectors.search.return_value = []
+        mock_client.embeddings.search.return_value = []
 
         # Act
-        results = await service.search_by_query(
-            query="nonexistent query",
-            hackathon_id="hack-123"
-        )
+        result = await service.search_all(query="nonexistent query")
 
         # Assert
-        assert results == []
+        assert result["results"] == []
+        assert result["total_results"] == 0
 
     @pytest.mark.asyncio
     async def test_search_with_special_characters_in_query(self):
@@ -805,132 +741,158 @@ class TestEdgeCases:
         # Arrange
         mock_client = AsyncMock()
         service = SearchService(mock_client)
-
-        mock_client.embeddings.generate.return_value = {
-            "embedding": [0.1] * 384
-        }
-        mock_client.vectors.search.return_value = []
+        mock_client.embeddings.search.return_value = []
 
         # Act
-        results = await service.search_by_query(
+        result = await service.search_all(
             query="C++ & Python projects with $ symbols!",
-            hackathon_id="hack-123"
         )
 
         # Assert - should not raise error
-        assert isinstance(results, list)
+        assert isinstance(result, dict)
+        assert result["results"] == []
 
     @pytest.mark.asyncio
-    async def test_search_with_very_long_query(self):
-        """Should handle very long queries"""
+    async def test_search_hackathon_with_no_results(self):
+        """Should handle empty hackathon search results gracefully"""
         # Arrange
         mock_client = AsyncMock()
         service = SearchService(mock_client)
-
-        mock_client.embeddings.generate.return_value = {
-            "embedding": [0.1] * 384
-        }
-        mock_client.vectors.search.return_value = []
-
-        long_query = "test " * 100  # 500 characters
+        mock_client.tables.query_rows.return_value = [{"hackathon_id": "hack-123"}]
+        mock_client.embeddings.search.return_value = []
 
         # Act
-        results = await service.search_by_query(
-            query=long_query,
-            hackathon_id="hack-123"
-        )
-
-        # Assert - should not raise error
-        assert isinstance(results, list)
-
-    @pytest.mark.asyncio
-    async def test_find_similar_with_only_self_in_results(self):
-        """Should return empty list if only self is found"""
-        # Arrange
-        mock_client = AsyncMock()
-        service = SearchService(mock_client)
-
-        mock_client.vectors.get.return_value = {
-            "embedding": [0.5] * 384
-        }
-
-        # Only self in results
-        mock_client.vectors.search.return_value = [
-            {
-                "vector_id": "sub-123",
-                "similarity": 1.0,
-                "metadata": {
-                    "submission_id": "sub-123",
-                    "hackathon_id": "hack-456",
-                    "project_name": "Self",
-                    "description": "Self"
-                }
-            }
-        ]
-
-        # Act
-        results = await service.find_similar_submissions(
-            submission_id="sub-123",
-            hackathon_id="hack-456"
+        result = await service.search_hackathon(
+            hackathon_id="hack-123",
+            query="nonexistent",
         )
 
         # Assert
-        assert results == []
-
-
-class TestCoverageCompletion:
-    """Additional tests to reach 80%+ coverage"""
+        assert result["results"] == []
+        assert result["total_results"] == 0
+        assert result["hackathon_id"] == "hack-123"
 
     @pytest.mark.asyncio
-    async def test_search_by_query_catches_generic_exception(self):
-        """Should catch and wrap generic exceptions"""
+    async def test_search_all_uses_global_namespace(self):
+        """Should use 'global' namespace for universal search"""
         # Arrange
         mock_client = AsyncMock()
         service = SearchService(mock_client)
+        mock_client.embeddings.search.return_value = []
 
-        # Simulate unexpected error
-        mock_client.embeddings.generate.side_effect = RuntimeError(
-            "Unexpected error"
-        )
+        # Act
+        await service.search_all(query="test")
 
-        # Act & Assert
-        with pytest.raises(ZeroDBError) as exc_info:
-            await service.search_by_query(
-                query="test",
-                hackathon_id="hack-123"
-            )
-        assert "embedding generation failed" in str(exc_info.value).lower()
+        # Assert
+        call_args = mock_client.embeddings.search.call_args
+        assert call_args.kwargs["namespace"] == "global"
 
     @pytest.mark.asyncio
-    async def test_find_similar_catches_generic_exception(self):
-        """Should catch and wrap generic exceptions in find_similar"""
+    async def test_search_all_includes_metadata_flag(self):
+        """Should request include_metadata=True"""
         # Arrange
         mock_client = AsyncMock()
         service = SearchService(mock_client)
+        mock_client.embeddings.search.return_value = []
 
-        mock_client.vectors.get.side_effect = RuntimeError(
-            "Unexpected error"
-        )
+        # Act
+        await service.search_all(query="test")
 
-        # Act & Assert
-        with pytest.raises(ZeroDBError) as exc_info:
-            await service.find_similar_submissions(
-                submission_id="sub-123",
-                hackathon_id="hack-456"
-            )
-        assert "search failed" in str(exc_info.value).lower()
+        # Assert
+        call_args = mock_client.embeddings.search.call_args
+        assert call_args.kwargs["include_metadata"] is True
 
-    def test_search_result_default_metadata(self):
-        """Should use empty dict as default metadata"""
+    @pytest.mark.asyncio
+    async def test_search_all_top_k_accounts_for_offset(self):
+        """Should request top_k = limit + offset for pagination"""
+        # Arrange
+        mock_client = AsyncMock()
+        service = SearchService(mock_client)
+        mock_client.embeddings.search.return_value = []
+
+        # Act
+        await service.search_all(query="test", limit=10, offset=5)
+
+        # Assert
+        call_args = mock_client.embeddings.search.call_args
+        assert call_args.kwargs["top_k"] == 15  # 10 + 5
+
+
+class TestSearchResponseModels:
+    """Test SearchResponse and HackathonSearchResponse models"""
+
+    def test_search_response_creation(self):
+        """Should create SearchResponse with all fields"""
         # Arrange & Act
-        result = SearchResult(
-            submission_id="sub-123",
-            hackathon_id="hack-456",
-            title="Test",
-            description="Test desc",
-            similarity_score=0.8
-            # metadata not provided
+        response = SearchResponse(
+            query="test query",
+            total_results=2,
+            results=[
+                SearchResult(
+                    id="sub-1",
+                    score=0.9,
+                    metadata=SearchResultMetadata(entity_type="submission"),
+                ),
+                SearchResult(
+                    id="sub-2",
+                    score=0.8,
+                    metadata=SearchResultMetadata(entity_type="submission"),
+                ),
+            ],
+            limit=10,
+            offset=0,
+            has_more=False,
+            execution_time_ms=45.2,
         )
 
         # Assert
-        assert result.metadata == {}
+        assert response.query == "test query"
+        assert response.total_results == 2
+        assert len(response.results) == 2
+        assert response.limit == 10
+        assert response.offset == 0
+        assert response.has_more is False
+        assert response.execution_time_ms == 45.2
+
+    def test_hackathon_search_response_creation(self):
+        """Should create HackathonSearchResponse with hackathon_id"""
+        # Arrange & Act
+        response = HackathonSearchResponse(
+            query="test",
+            total_results=1,
+            results=[
+                SearchResult(
+                    id="sub-1",
+                    score=0.95,
+                    metadata=SearchResultMetadata(
+                        entity_type="submission",
+                        hackathon_id="hack-456",
+                    ),
+                ),
+            ],
+            limit=10,
+            offset=0,
+            has_more=False,
+            hackathon_id="hack-456",
+        )
+
+        # Assert
+        assert response.hackathon_id == "hack-456"
+        assert response.results[0].metadata.hackathon_id == "hack-456"
+
+    def test_search_result_metadata_optional_fields(self):
+        """Should allow optional fields to be None"""
+        # Arrange & Act
+        metadata = SearchResultMetadata(entity_type="submission")
+
+        # Assert
+        assert metadata.entity_type == "submission"
+        assert metadata.hackathon_id is None
+        assert metadata.track_id is None
+        assert metadata.team_id is None
+        assert metadata.status is None
+        assert metadata.title is None
+        assert metadata.description is None
+        assert metadata.tags is None
+        assert metadata.submitted_at is None
+        assert metadata.created_at is None

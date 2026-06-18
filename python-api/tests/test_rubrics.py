@@ -20,6 +20,12 @@ app = FastAPI()
 app.include_router(router)
 
 
+@app.exception_handler(Exception)
+async def general_exception_handler(request, exc):
+    from fastapi.responses import JSONResponse
+    return JSONResponse(status_code=500, content={"detail": str(exc)})
+
+
 @pytest.fixture
 def mock_user():
     """Mock authenticated user"""
@@ -49,7 +55,7 @@ def client(mock_user, mock_zerodb_client):
     app.dependency_overrides[get_current_user] = override_get_current_user
     app.dependency_overrides[get_zerodb_client] = override_get_zerodb_client
 
-    yield TestClient(app)
+    yield TestClient(app, raise_server_exceptions=False)
 
     # Clean up
     app.dependency_overrides.clear()

@@ -130,15 +130,6 @@ class ZeroDBClient:
         return self._events
 
     @property
-    def embeddings(self):
-        """Access Embeddings API operations"""
-        if self._embeddings is None:
-            from .embeddings import EmbeddingsAPI
-
-            self._embeddings = EmbeddingsAPI(self)
-        return self._embeddings
-
-    @property
     def rlhf(self):
         """Access RLHF API operations"""
         if self._rlhf is None:
@@ -165,12 +156,6 @@ class ZeroDBClient:
             self._files = FilesAPI(self)
         return self._files
 
-    @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=1, max=10),
-        retry=retry_if_exception_type((httpx.NetworkError, httpx.TimeoutException)),
-        reraise=True,
-    )
     async def _request(
         self,
         method: str,
@@ -196,59 +181,67 @@ class ZeroDBClient:
             ZeroDBError: Other API errors
         """
         try:
-            # Make request
-            response = await self._http_client.request(method, path, **kwargs)
-
-            # Handle error status codes
-            if response.status_code == 401:
-                raise ZeroDBAuthError(
-                    "Authentication failed - invalid API key",
-                    status_code=401,
-                    response=response.json() if response.content else None,
-                )
-            elif response.status_code == 403:
-                raise ZeroDBAuthError(
-                    "Permission denied - insufficient privileges",
-                    status_code=403,
-                    response=response.json() if response.content else None,
-                )
-            elif response.status_code == 404:
-                raise ZeroDBNotFound(
-                    "Resource not found",
-                    status_code=404,
-                    response=response.json() if response.content else None,
-                )
-            elif response.status_code == 429:
-                raise ZeroDBRateLimitError(
-                    "Rate limit exceeded - please retry later",
-                    status_code=429,
-                    response=response.json() if response.content else None,
-                )
-            elif response.status_code >= 400:
-                error_msg = f"API error: {response.status_code}"
-                try:
-                    error_data = response.json()
-                    error_msg = error_data.get("error", error_msg)
-                except Exception:
-                    pass
-                raise ZeroDBError(
-                    error_msg,
-                    status_code=response.status_code,
-                    response=response.json() if response.content else None,
-                )
-
-            # Return successful response
-            return response.json()
-
+            return await self._request_with_retry(method, path, **kwargs)
         except httpx.TimeoutException as e:
             raise ZeroDBTimeoutError(f"Request timed out after {self.timeout}s") from e
         except httpx.NetworkError as e:
             raise ZeroDBError(f"Network error: {str(e)}") from e
-        except (ZeroDBAuthError, ZeroDBNotFound, ZeroDBRateLimitError, ZeroDBTimeoutError):
-            # Re-raise ZeroDB exceptions as-is
-            raise
-        except Exception as e:
-            raise ZeroDBError(f"Unexpected error: {str(e)}") from e
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=10),
+        retry=retry_if_exception_type((httpx.NetworkError, httpx.TimeoutException)),
+        reraise=True,
+    )
+    async def _request_with_retry(
+        self,
+        method: str,
+        path: str,
+        **kwargs,
+    ) -> dict[str, Any]:
+        """Internal method with retry logic. Lets httpx exceptions propagate for tenacity."""
+        response = await self._http_client.request(method, path, **kwargs)
+
+        # Handle error status codes
+        if response.status_code == 401:
+            raise ZeroDBAuthError(
+                "Authentication failed - invalid API key",
+                status_code=401,
+                response=response.json() if response.content else None,
+            )
+        elif response.status_code == 403:
+            raise ZeroDBAuthError(
+                "Permission denied - insufficient privileges",
+                status_code=403,
+                response=response.json() if response.content else None,
+            )
+        elif response.status_code == 404:
+            raise ZeroDBNotFound(
+                "Resource not found",
+                status_code=404,
+                response=response.json() if response.content else None,
+            )
+        elif response.status_code == 429:
+            raise ZeroDBRateLimitError(
+                "Rate limit exceeded - please retry later",
+                status_code=429,
+                response=response.json() if response.content else None,
+            )
+        elif response.status_code >= 400:
+            error_msg = f"API error: {response.status_code}"
+            try:
+                error_data = response.json()
+                error_msg = error_data.get("error", error_msg)
+            except Exception:
+                pass
+            raise ZeroDBError(
+                error_msg,
+                status_code=response.status_code,
+                response=response.json() if response.content else None,
+            )
+
+        # Return successful response
+        return response.json()
 
     async def get_project_info(self) -> dict[str, Any]:
         """

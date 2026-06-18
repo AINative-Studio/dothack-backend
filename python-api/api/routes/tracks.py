@@ -125,6 +125,7 @@ async def list_tracks(
     return TrackListResponse(
         tracks=[TrackResponse(**track) for track in result["tracks"]],
         total=result["total"],
+        hackathon_id=hackathon_id,
     )
 
 

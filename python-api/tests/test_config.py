@@ -40,17 +40,18 @@ def test_config_has_default_values(monkeypatch):
     assert hasattr(settings, "API_VERSION")
 
 
-def test_config_allowed_origins_is_list(mock_env):
+def test_config_allowed_origins_is_comma_separated(mock_env):
     """
-    Test that ALLOWED_ORIGINS is parsed as a list.
+    Test that ALLOWED_ORIGINS is a comma-separated string that can be split into a list.
     """
     from config import Settings
 
     settings = Settings()
 
-    assert isinstance(settings.ALLOWED_ORIGINS, list)
-    assert len(settings.ALLOWED_ORIGINS) > 0
-    assert "http://localhost:3000" in settings.ALLOWED_ORIGINS
+    assert isinstance(settings.ALLOWED_ORIGINS, str)
+    origins = [o.strip() for o in settings.ALLOWED_ORIGINS.split(",")]
+    assert len(origins) > 0
+    assert "http://localhost:3000" in origins
 
 
 def test_config_validation_enforces_types(monkeypatch):

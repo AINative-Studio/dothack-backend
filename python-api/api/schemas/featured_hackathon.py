@@ -7,7 +7,7 @@ Defines request and response models for featured hackathon management.
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class FeaturedHackathonCreateRequest(BaseModel):
@@ -106,8 +106,7 @@ class FeaturedHackathonResponse(BaseModel):
     updated_at: str
     hackathon: Optional[dict] = Field(None, description="Nested hackathon details")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class FeaturedHackathonListResponse(BaseModel):
@@ -118,7 +117,7 @@ class FeaturedHackathonListResponse(BaseModel):
         featured: List of featured hackathons
         total: Total number of featured hackathons
     """
-    featured: List[FeaturedHackathonResponse]
+    featured_hackathons: List[FeaturedHackathonResponse]
     total: int
 
 

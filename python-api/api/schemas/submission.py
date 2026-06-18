@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import List, Literal, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 # Type for valid submission status
@@ -45,8 +45,7 @@ class FileMetadata(BaseModel):
             raise ValueError("File name cannot be empty or whitespace")
         return v.strip()
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Submission Creation Schemas
@@ -180,8 +179,7 @@ class SubmissionResponse(BaseModel):
     updated_at: datetime
     submitted_at: Optional[datetime]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class SubmissionListResponse(BaseModel):
@@ -200,8 +198,7 @@ class SubmissionListResponse(BaseModel):
     skip: int = Field(default=0, ge=0, description="Pagination offset")
     limit: int = Field(default=100, ge=1, le=1000, description="Pagination limit")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # File Upload Schemas
@@ -258,8 +255,7 @@ class FileUploadResponse(BaseModel):
     file_size: int
     uploaded_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Similar Submissions Schemas
@@ -294,8 +290,7 @@ class SimilarSubmissionItem(BaseModel):
     repository_url: Optional[str] = Field(None, description="Git repository URL")
     demo_url: Optional[str] = Field(None, description="Live demo URL")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class SimilarSubmissionsResponse(BaseModel):

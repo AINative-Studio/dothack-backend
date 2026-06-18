@@ -8,7 +8,7 @@ feedback collection endpoints.
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class LogInteractionRequest(BaseModel):
@@ -29,21 +29,20 @@ class LogInteractionRequest(BaseModel):
         description="Session identifier for conversation tracking",
     )
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "prompt": "Recommend submissions for judge-123 in hackathon-456",
-                "response": "Recommended 5 submissions based on judge's expertise in AI/ML",
-                "context": {
-                    "user_id": "judge-123",
-                    "hackathon_id": "hack-456",
-                    "feature_type": "judge_recommendations",
-                    "recommended_count": 5,
-                },
-                "agent_id": "recommendations_service",
-                "session_id": "sess-abc-123",
-            }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "prompt": "Recommend submissions for judge-123 in hackathon-456",
+            "response": "Recommended 5 submissions based on judge's expertise in AI/ML",
+            "context": {
+                "user_id": "judge-123",
+                "hackathon_id": "hack-456",
+                "feature_type": "judge_recommendations",
+                "recommended_count": 5,
+            },
+            "agent_id": "recommendations_service",
+            "session_id": "sess-abc-123",
         }
+    })
 
 
 class LogInteractionResponse(BaseModel):
@@ -53,14 +52,13 @@ class LogInteractionResponse(BaseModel):
     interaction_id: str
     timestamp: datetime
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "success": True,
-                "interaction_id": "int-123-abc-456",
-                "timestamp": "2024-01-15T10:30:00Z",
-            }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "success": True,
+            "interaction_id": "int-123-abc-456",
+            "timestamp": "2024-01-15T10:30:00Z",
         }
+    })
 
 
 class SubmitFeedbackRequest(BaseModel):
@@ -88,26 +86,26 @@ class SubmitFeedbackRequest(BaseModel):
         description="Additional metadata (e.g., outcome, action_taken)",
     )
 
-    @validator("rating")
-    def validate_rating(cls, v, values):
+    @field_validator("rating")
+    @classmethod
+    def validate_rating(cls, v, info):
         """Validate that rating is provided if feedback_type is 'rating'."""
-        if values.get("feedback_type") == "rating" and v is None:
+        if info.data.get("feedback_type") == "rating" and v is None:
             raise ValueError("Rating is required when feedback_type is 'rating'")
         return v
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "interaction_id": "int-123-abc-456",
-                "feedback_type": "rating",
-                "rating": 5,
-                "comment": "Perfect recommendations! All submissions were highly relevant.",
-                "metadata": {
-                    "action_taken": "reviewed_all",
-                    "outcome": "successful",
-                },
-            }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "interaction_id": "int-123-abc-456",
+            "feedback_type": "rating",
+            "rating": 5,
+            "comment": "Perfect recommendations! All submissions were highly relevant.",
+            "metadata": {
+                "action_taken": "reviewed_all",
+                "outcome": "successful",
+            },
         }
+    })
 
 
 class SubmitFeedbackResponse(BaseModel):
@@ -118,15 +116,14 @@ class SubmitFeedbackResponse(BaseModel):
     feedback_tracked: bool
     timestamp: datetime
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "success": True,
-                "interaction_id": "int-123-abc-456",
-                "feedback_tracked": True,
-                "timestamp": "2024-01-15T10:35:00Z",
-            }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "success": True,
+            "interaction_id": "int-123-abc-456",
+            "feedback_tracked": True,
+            "timestamp": "2024-01-15T10:35:00Z",
         }
+    })
 
 
 class InteractionDetails(BaseModel):
@@ -144,28 +141,27 @@ class InteractionDetails(BaseModel):
         description="Feedback data if available",
     )
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "interaction_id": "int-123-abc-456",
-                "prompt": "Recommend submissions for judge-123",
-                "response": "Recommended 5 submissions based on expertise",
-                "context": {
-                    "user_id": "judge-123",
-                    "hackathon_id": "hack-456",
-                    "feature_type": "judge_recommendations",
-                },
-                "agent_id": "recommendations_service",
-                "session_id": "sess-abc-123",
-                "created_at": "2024-01-15T10:30:00Z",
-                "feedback": {
-                    "feedback_type": "rating",
-                    "rating": 5,
-                    "comment": "Perfect recommendations!",
-                    "submitted_at": "2024-01-15T10:35:00Z",
-                },
-            }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "interaction_id": "int-123-abc-456",
+            "prompt": "Recommend submissions for judge-123",
+            "response": "Recommended 5 submissions based on expertise",
+            "context": {
+                "user_id": "judge-123",
+                "hackathon_id": "hack-456",
+                "feature_type": "judge_recommendations",
+            },
+            "agent_id": "recommendations_service",
+            "session_id": "sess-abc-123",
+            "created_at": "2024-01-15T10:30:00Z",
+            "feedback": {
+                "feedback_type": "rating",
+                "rating": 5,
+                "comment": "Perfect recommendations!",
+                "submitted_at": "2024-01-15T10:35:00Z",
+            },
         }
+    })
 
 
 class FeedbackStats(BaseModel):
@@ -182,16 +178,15 @@ class FeedbackStats(BaseModel):
         description="Percentage of interactions with feedback",
     )
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "thumbs_up_count": 45,
-                "thumbs_down_count": 5,
-                "rating_count": 30,
-                "average_rating": 4.2,
-                "feedback_rate": 0.75,
-            }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "thumbs_up_count": 45,
+            "thumbs_down_count": 5,
+            "rating_count": 30,
+            "average_rating": 4.2,
+            "feedback_rate": 0.75,
         }
+    })
 
 
 class TopIssue(BaseModel):
@@ -199,26 +194,25 @@ class TopIssue(BaseModel):
 
     issue_category: str
     count: int = Field(..., ge=0)
-    example_comments: List[str] = Field(..., max_items=3)
+    example_comments: List[str] = Field(..., max_length=3)
     severity: str = Field(
         ...,
         pattern="^(low|medium|high|critical)$",
         description="Issue severity level",
     )
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "issue_category": "irrelevant_recommendations",
-                "count": 12,
-                "example_comments": [
-                    "Recommendations didn't match my expertise",
-                    "Suggested submissions were not in my domain",
-                    "Poor relevance to my interests",
-                ],
-                "severity": "medium",
-            }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "issue_category": "irrelevant_recommendations",
+            "count": 12,
+            "example_comments": [
+                "Recommendations didn't match my expertise",
+                "Suggested submissions were not in my domain",
+                "Poor relevance to my interests",
+            ],
+            "severity": "medium",
         }
+    })
 
 
 class ImprovementSuggestion(BaseModel):
@@ -237,15 +231,14 @@ class ImprovementSuggestion(BaseModel):
         description="Expected impact if implemented",
     )
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "category": "recommendation_quality",
-                "suggestion": "Improve judge expertise matching by incorporating past evaluation history and scores",
-                "priority": "high",
-                "estimated_impact": "high",
-            }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "category": "recommendation_quality",
+            "suggestion": "Improve judge expertise matching by incorporating past evaluation history and scores",
+            "priority": "high",
+            "estimated_impact": "high",
         }
+    })
 
 
 class RLHFSummaryReport(BaseModel):
@@ -257,12 +250,12 @@ class RLHFSummaryReport(BaseModel):
     feedback_stats: FeedbackStats
     top_issues: List[TopIssue] = Field(
         ...,
-        max_items=10,
+        max_length=10,
         description="Top issues identified from feedback",
     )
     improvement_suggestions: List[ImprovementSuggestion] = Field(
         ...,
-        max_items=10,
+        max_length=10,
         description="AI-generated improvement suggestions",
     )
     feature_breakdown: Optional[Dict[str, Any]] = Field(
@@ -270,41 +263,40 @@ class RLHFSummaryReport(BaseModel):
         description="Breakdown by feature type (recommendations, search, etc.)",
     )
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "time_range": "week",
-                "generated_at": "2024-01-15T12:00:00Z",
-                "total_interactions": 250,
-                "feedback_stats": {
-                    "thumbs_up_count": 180,
-                    "thumbs_down_count": 20,
-                    "rating_count": 150,
-                    "average_rating": 4.3,
-                    "feedback_rate": 0.8,
-                },
-                "top_issues": [
-                    {
-                        "issue_category": "irrelevant_recommendations",
-                        "count": 12,
-                        "example_comments": ["Not relevant to my expertise"],
-                        "severity": "medium",
-                    }
-                ],
-                "improvement_suggestions": [
-                    {
-                        "category": "recommendation_quality",
-                        "suggestion": "Improve expertise matching algorithm",
-                        "priority": "high",
-                        "estimated_impact": "high",
-                    }
-                ],
-                "feature_breakdown": {
-                    "judge_recommendations": {"total": 150, "avg_rating": 4.5},
-                    "team_suggestions": {"total": 100, "avg_rating": 4.0},
-                },
-            }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "time_range": "week",
+            "generated_at": "2024-01-15T12:00:00Z",
+            "total_interactions": 250,
+            "feedback_stats": {
+                "thumbs_up_count": 180,
+                "thumbs_down_count": 20,
+                "rating_count": 150,
+                "average_rating": 4.3,
+                "feedback_rate": 0.8,
+            },
+            "top_issues": [
+                {
+                    "issue_category": "irrelevant_recommendations",
+                    "count": 12,
+                    "example_comments": ["Not relevant to my expertise"],
+                    "severity": "medium",
+                }
+            ],
+            "improvement_suggestions": [
+                {
+                    "category": "recommendation_quality",
+                    "suggestion": "Improve expertise matching algorithm",
+                    "priority": "high",
+                    "estimated_impact": "high",
+                }
+            ],
+            "feature_breakdown": {
+                "judge_recommendations": {"total": 150, "avg_rating": 4.5},
+                "team_suggestions": {"total": 100, "avg_rating": 4.0},
+            },
         }
+    })
 
 
 class ListInteractionsResponse(BaseModel):
@@ -316,26 +308,25 @@ class ListInteractionsResponse(BaseModel):
     offset: int = Field(..., ge=0)
     has_more: bool
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "interactions": [
-                    {
-                        "interaction_id": "int-123",
-                        "prompt": "Recommend submissions",
-                        "response": "Here are 5 recommendations",
-                        "context": {"user_id": "judge-123"},
-                        "agent_id": "recommendations_service",
-                        "created_at": "2024-01-15T10:30:00Z",
-                        "feedback": {
-                            "feedback_type": "rating",
-                            "rating": 5,
-                        },
-                    }
-                ],
-                "total_count": 250,
-                "limit": 100,
-                "offset": 0,
-                "has_more": True,
-            }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "interactions": [
+                {
+                    "interaction_id": "int-123",
+                    "prompt": "Recommend submissions",
+                    "response": "Here are 5 recommendations",
+                    "context": {"user_id": "judge-123"},
+                    "agent_id": "recommendations_service",
+                    "created_at": "2024-01-15T10:30:00Z",
+                    "feedback": {
+                        "feedback_type": "rating",
+                        "rating": 5,
+                    },
+                }
+            ],
+            "total_count": 250,
+            "limit": 100,
+            "offset": 0,
+            "has_more": True,
         }
+    })

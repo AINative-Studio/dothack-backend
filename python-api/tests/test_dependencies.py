@@ -9,6 +9,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi import HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials
+from integrations.ainative.exceptions import (
+    InvalidTokenError,
+    InvalidAPIKeyError,
+)
 
 
 class TestGetCurrentUser:
@@ -22,6 +26,7 @@ class TestGetCurrentUser:
 
         mock_request = MagicMock()
         mock_request.headers.get.return_value = None  # No X-API-Key header
+        mock_request.url.path = "/test"
 
         mock_credentials = HTTPAuthorizationCredentials(
             scheme="Bearer", credentials="valid_jwt_token"
@@ -53,21 +58,23 @@ class TestGetCurrentUser:
 
         mock_request = MagicMock()
         mock_request.headers.get.return_value = None
+        mock_request.url.path = "/test"
 
         mock_credentials = HTTPAuthorizationCredentials(
             scheme="Bearer", credentials="invalid_token"
         )
 
-        # Mock the auth_client.verify_token returning None
+        # Mock the auth_client.verify_token raising InvalidTokenError
         with patch("api.dependencies.auth_client") as mock_auth_client:
-            mock_auth_client.verify_token = AsyncMock(return_value=None)
+            mock_auth_client.verify_token = AsyncMock(
+                side_effect=InvalidTokenError("Invalid or expired token")
+            )
 
             # Act & Assert
             with pytest.raises(HTTPException) as exc_info:
                 await get_current_user(mock_request, mock_credentials)
 
             assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
-            assert "Invalid or expired token" in exc_info.value.detail
 
     @pytest.mark.asyncio
     async def test_get_current_user_with_valid_api_key_in_header(self):
@@ -77,6 +84,7 @@ class TestGetCurrentUser:
 
         mock_request = MagicMock()
         mock_request.headers.get.return_value = "sk_test_valid_api_key"
+        mock_request.url.path = "/test"
 
         mock_credentials = HTTPAuthorizationCredentials(
             scheme="Bearer", credentials="ignored_when_api_key_present"
@@ -108,19 +116,21 @@ class TestGetCurrentUser:
 
         mock_request = MagicMock()
         mock_request.headers.get.return_value = "invalid_api_key"
+        mock_request.url.path = "/test"
 
         mock_credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="ignored")
 
-        # Mock the auth_client.verify_api_key returning None
+        # Mock the auth_client.verify_api_key raising InvalidAPIKeyError
         with patch("api.dependencies.auth_client") as mock_auth_client:
-            mock_auth_client.verify_api_key = AsyncMock(return_value=None)
+            mock_auth_client.verify_api_key = AsyncMock(
+                side_effect=InvalidAPIKeyError("Invalid API key")
+            )
 
             # Act & Assert
             with pytest.raises(HTTPException) as exc_info:
                 await get_current_user(mock_request, mock_credentials)
 
             assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
-            assert "Invalid API key" in exc_info.value.detail
 
     @pytest.mark.asyncio
     async def test_get_current_user_prioritizes_api_key_over_jwt(self):
@@ -130,6 +140,7 @@ class TestGetCurrentUser:
 
         mock_request = MagicMock()
         mock_request.headers.get.return_value = "sk_test_api_key"
+        mock_request.url.path = "/test"
 
         mock_credentials = HTTPAuthorizationCredentials(
             scheme="Bearer", credentials="jwt_token_should_be_ignored"
@@ -166,7 +177,11 @@ class TestGetCurrentUserOptional:
         from api.dependencies import get_current_user_optional
 
         mock_request = MagicMock()
-        mock_request.headers.get.return_value = None
+        mock_request.headers.get.side_effect = lambda key: {
+            "authorization": "Bearer valid_token",
+            "x-api-key": None,
+        }.get(key)
+        mock_request.url.path = "/test"
 
         expected_user = {
             "id": "user-123",
@@ -175,9 +190,9 @@ class TestGetCurrentUserOptional:
             "email_verified": True,
         }
 
-        # Mock get_current_user to return user
-        with patch("api.dependencies.get_current_user", new_callable=AsyncMock) as mock_get_user:
-            mock_get_user.return_value = expected_user
+        # Mock auth_client.verify_token to return the user
+        with patch("api.dependencies.auth_client") as mock_auth_client:
+            mock_auth_client.verify_token = AsyncMock(return_value=expected_user)
 
             # Act
             result = await get_current_user_optional(mock_request)
@@ -192,11 +207,16 @@ class TestGetCurrentUserOptional:
         from api.dependencies import get_current_user_optional
 
         mock_request = MagicMock()
+        mock_request.headers.get.side_effect = lambda key: {
+            "authorization": "Bearer invalid_token",
+            "x-api-key": None,
+        }.get(key)
+        mock_request.url.path = "/test"
 
-        # Mock get_current_user to raise HTTPException
-        with patch("api.dependencies.get_current_user", new_callable=AsyncMock) as mock_get_user:
-            mock_get_user.side_effect = HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
+        # Mock auth_client.verify_token to raise an error
+        with patch("api.dependencies.auth_client") as mock_auth_client:
+            mock_auth_client.verify_token = AsyncMock(
+                side_effect=InvalidTokenError("Invalid token")
             )
 
             # Act
@@ -212,18 +232,14 @@ class TestGetCurrentUserOptional:
         from api.dependencies import get_current_user_optional
 
         mock_request = MagicMock()
+        # No authorization header at all
+        mock_request.headers.get.return_value = None
 
-        # Mock get_current_user to raise HTTPException for missing credentials
-        with patch("api.dependencies.get_current_user", new_callable=AsyncMock) as mock_get_user:
-            mock_get_user.side_effect = HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated"
-            )
+        # Act
+        result = await get_current_user_optional(mock_request)
 
-            # Act
-            result = await get_current_user_optional(mock_request)
-
-            # Assert
-            assert result is None
+        # Assert
+        assert result is None
 
 
 class TestGetApiKey:

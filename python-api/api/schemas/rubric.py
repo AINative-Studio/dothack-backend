@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import List, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class CriterionSchema(BaseModel):
@@ -45,7 +45,7 @@ class RubricCreateRequest(BaseModel):
         is_active: Whether this rubric should be set as active immediately
     """
     name: str = Field(..., min_length=1, max_length=200, description="Rubric name")
-    criteria: List[CriterionSchema] = Field(..., min_items=1, max_items=20, description="Judging criteria")
+    criteria: List[CriterionSchema] = Field(..., min_length=1, max_length=20, description="Judging criteria")
     is_active: bool = Field(default=False, description="Set as active rubric")
 
     @field_validator('name')
@@ -81,7 +81,7 @@ class RubricUpdateRequest(BaseModel):
         criteria: List of criterion definitions
     """
     name: Optional[str] = Field(None, min_length=1, max_length=200, description="Rubric name")
-    criteria: Optional[List[CriterionSchema]] = Field(None, min_items=1, max_items=20, description="Judging criteria")
+    criteria: Optional[List[CriterionSchema]] = Field(None, min_length=1, max_length=20, description="Judging criteria")
 
     @field_validator('name')
     @classmethod
@@ -126,8 +126,7 @@ class RubricResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class RubricListResponse(BaseModel):

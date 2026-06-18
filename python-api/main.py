@@ -11,11 +11,13 @@ Initializes the FastAPI app with:
 
 import logging
 import sys
-from datetime import datetime
+from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from typing import Any
 
 from api.routes import (
     analytics,
+    auth,
     dashboard,
     export,
     featured_hackathons,
@@ -71,6 +73,21 @@ setup_logging()
 logger = logging.getLogger(__name__)
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan handler for startup and shutdown."""
+    # Startup
+    logger.info("=" * 60)
+    logger.info("DotHack Backend API Starting")
+    logger.info(f"Environment: {settings.ENVIRONMENT}")
+    logger.info(f"API Version: {settings.API_VERSION}")
+    logger.info(f"Log Level: {settings.LOG_LEVEL}")
+    logger.info("=" * 60)
+    yield
+    # Shutdown
+    logger.info("DotHack Backend API Shutting Down")
+
+
 # Initialize FastAPI app
 app = FastAPI(
     title="DotHack Backend API",
@@ -79,11 +96,16 @@ app = FastAPI(
     docs_url=f"/{settings.API_VERSION}/docs",
     redoc_url=f"/{settings.API_VERSION}/redoc",
     openapi_url="/openapi.json",
+    lifespan=lifespan,
 )
 
 
 # CORS Configuration
-allowed_origins = [origin.strip() for origin in settings.ALLOWED_ORIGINS.split(",")]
+allowed_origins = (
+    settings.ALLOWED_ORIGINS
+    if isinstance(settings.ALLOWED_ORIGINS, list)
+    else [origin.strip() for origin in settings.ALLOWED_ORIGINS.split(",")]
+)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
@@ -96,6 +118,7 @@ logger.info(f"CORS configured with allowed origins: {settings.ALLOWED_ORIGINS}")
 
 
 # Register API Routes
+app.include_router(auth.router)
 app.include_router(hackathons.router)
 app.include_router(hackathon_themes.router)
 app.include_router(tracks.router)
@@ -178,13 +201,21 @@ async def validation_exception_handler(
     """
     logger.error(f"Validation error on {request.url.path}: {exc.errors()}")
 
+    # Sanitize errors to ensure JSON serializability
+    sanitized_errors = []
+    for error in exc.errors():
+        sanitized = {k: v for k, v in error.items() if k != "ctx"}
+        if "ctx" in error and error["ctx"]:
+            sanitized["ctx"] = {k: str(v) for k, v in error["ctx"].items()}
+        sanitized_errors.append(sanitized)
+
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content={
             "error": {
                 "status_code": 422,
                 "message": "Validation error",
-                "details": exc.errors(),
+                "details": sanitized_errors,
                 "path": str(request.url.path),
             }
         },
@@ -258,35 +289,7 @@ async def health_check() -> dict[str, Any]:
             "timestamp": "2024-01-01T00:00:00.000000"
         }
     """
-    return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
-
-
-# Startup event
-@app.on_event("startup")
-async def startup_event() -> None:
-    """
-    Execute tasks on application startup.
-
-    Logs:
-    - Application started message
-    - Environment configuration
-    - API version
-    """
-    logger.info("=" * 60)
-    logger.info("DotHack Backend API Starting")
-    logger.info(f"Environment: {settings.ENVIRONMENT}")
-    logger.info(f"API Version: {settings.API_VERSION}")
-    logger.info(f"Log Level: {settings.LOG_LEVEL}")
-    logger.info("=" * 60)
-
-
-# Shutdown event
-@app.on_event("shutdown")
-async def shutdown_event() -> None:
-    """
-    Execute cleanup tasks on application shutdown.
-    """
-    logger.info("DotHack Backend API Shutting Down")
+    return {"status": "healthy", "timestamp": datetime.now(timezone.utc).isoformat()}
 
 
 if __name__ == "__main__":

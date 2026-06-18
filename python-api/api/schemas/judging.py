@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import List, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 # Score Submission Schemas
@@ -60,8 +60,7 @@ class ScoreResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ScoreListResponse(BaseModel):
@@ -111,8 +110,7 @@ class LeaderboardEntry(BaseModel):
     score_count: int = Field(..., ge=0, description="Number of scores")
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class LeaderboardResponse(BaseModel):
@@ -171,8 +169,7 @@ class RankingEntry(BaseModel):
     judge_count: int = Field(..., ge=0, description="Number of judges")
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class RankingsResponse(BaseModel):

@@ -447,3 +447,53 @@ class TrackService:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="An unexpected error occurred. Please contact support.",
             )
+
+
+# Module-level wrapper functions for use by route handlers.
+# Each function instantiates TrackService with the provided zerodb client
+# and delegates to the corresponding instance method.
+
+
+async def create_track(
+    hackathon_id: str,
+    name: str,
+    description: Optional[str] = None,
+    zerodb: ZeroDBClient = None,
+) -> Dict:
+    """Create a new track for a hackathon."""
+    service = TrackService(zerodb)
+    return await service.create_track(hackathon_id, name, description)
+
+
+async def list_tracks(hackathon_id: str, zerodb: ZeroDBClient = None) -> Dict:
+    """List all tracks for a hackathon."""
+    service = TrackService(zerodb)
+    tracks = await service.list_tracks(hackathon_id)
+    return {"tracks": tracks, "total": len(tracks)}
+
+
+async def get_track(
+    hackathon_id: str, track_id: str, zerodb: ZeroDBClient = None
+) -> Dict:
+    """Get a specific track by ID."""
+    service = TrackService(zerodb)
+    return await service.get_track(hackathon_id, track_id)
+
+
+async def update_track(
+    hackathon_id: str,
+    track_id: str,
+    update_data: Dict,
+    zerodb: ZeroDBClient = None,
+) -> Dict:
+    """Update a track."""
+    service = TrackService(zerodb)
+    return await service.update_track(hackathon_id, track_id, update_data)
+
+
+async def delete_track(
+    hackathon_id: str, track_id: str, zerodb: ZeroDBClient = None
+) -> Dict:
+    """Delete a track."""
+    service = TrackService(zerodb)
+    return await service.delete_track(hackathon_id, track_id)
