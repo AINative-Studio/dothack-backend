@@ -33,6 +33,12 @@ class Settings(BaseSettings):
     HOST: str = Field(default="0.0.0.0", description="Server host")
     PORT: int = Field(default=8000, description="Server port")
 
+    # AINative Authentication
+    AINATIVE_API_URL: str = Field(
+        default="https://api.ainative.studio",
+        description="AINative Studio API base URL for authentication",
+    )
+
     # ZeroDB Settings
     ZERODB_API_KEY: str = Field(default="", description="ZeroDB API key")
     ZERODB_PROJECT_ID: str = Field(default="", description="ZeroDB project ID")

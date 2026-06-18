@@ -6,6 +6,7 @@ Supports both JWT tokens and API keys for authentication with retry logic and st
 """
 
 import logging
+import os
 from typing import Any
 
 import httpx
@@ -43,15 +44,16 @@ class AINativeAuthClient:
     - Support for both JWT tokens and API keys
     """
 
-    def __init__(self, base_url: str = "https://api.ainative.studio"):
+    def __init__(self, base_url: str | None = None):
         """
         Initialize AINative authentication client
 
         Args:
-            base_url: Base URL for AINative API (default: production URL)
+            base_url: Base URL for AINative API. Falls back to AINATIVE_API_URL env var,
+                      then defaults to https://api.ainative.studio
         """
-        self.base_url = base_url
-        self.client = httpx.AsyncClient(base_url=base_url, timeout=10.0)  # 10 second timeout
+        self.base_url = base_url or os.getenv("AINATIVE_API_URL", "https://api.ainative.studio")
+        self.client = httpx.AsyncClient(base_url=self.base_url, timeout=10.0)
 
     async def verify_token(self, token: str) -> dict[str, Any]:
         """
