@@ -110,11 +110,17 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-API-Key", "Accept"],
 )
 
+# Rate limiting on auth endpoints (100 req/min per IP)
+from middleware.rate_limit import RateLimitMiddleware
+
+app.add_middleware(RateLimitMiddleware, limit=100, window=60)
+
 logger.info(f"CORS configured with allowed origins: {settings.ALLOWED_ORIGINS}")
+logger.info("Rate limiting middleware enabled (100 req/min per IP)")
 
 
 # Register API Routes
