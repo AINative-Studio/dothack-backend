@@ -26,8 +26,8 @@ from integrations.zerodb.dependencies import get_zerodb_client as _get_zerodb_cl
 # Configure structured logging
 logger = logging.getLogger(__name__)
 
-# Initialize HTTP Bearer security scheme
-security = HTTPBearer()
+# Initialize HTTP Bearer security scheme (auto_error=False allows X-API-Key fallback)
+security = HTTPBearer(auto_error=False)
 
 # Initialize AINative authentication client
 # Uses production URL by default, can be overridden with environment variable
@@ -35,7 +35,7 @@ auth_client = AINativeAuthClient()
 
 
 async def get_current_user(
-    request: Request, credentials: HTTPAuthorizationCredentials = Depends(security)
+    request: Request, credentials: HTTPAuthorizationCredentials | None = Depends(security)
 ) -> dict[str, Any]:
     """
     Get current authenticated user from AINative
@@ -91,6 +91,12 @@ async def get_current_user(
             return user
 
         # Verify JWT token (from Authorization: Bearer header)
+        if not credentials:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Not authenticated. Provide Authorization: Bearer <token> or X-API-Key header.",
+                headers={"WWW-Authenticate": "Bearer"}
+            )
         token = credentials.credentials
         logger.info(
             "Attempting authentication with JWT token",
