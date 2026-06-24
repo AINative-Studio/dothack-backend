@@ -61,7 +61,7 @@ async def get_organizer_dashboard(
     logger.info(f"User {current_user['id']} accessing organizer dashboard")
 
     dashboard = await dashboard_service.get_organizer_dashboard(
-        zerodb=zerodb,
+        zerodb_client=zerodb,
         user_id=current_user["id"],
     )
 
@@ -93,7 +93,7 @@ async def get_builder_dashboard(
     logger.info(f"User {current_user['id']} accessing builder dashboard")
 
     dashboard = await dashboard_service.get_builder_dashboard(
-        zerodb=zerodb,
+        zerodb_client=zerodb,
         user_id=current_user["id"],
     )
 
@@ -125,7 +125,7 @@ async def get_judge_dashboard(
     logger.info(f"User {current_user['id']} accessing judge dashboard")
 
     dashboard = await dashboard_service.get_judge_dashboard(
-        zerodb=zerodb,
+        zerodb_client=zerodb,
         user_id=current_user["id"],
     )
 
@@ -160,7 +160,7 @@ async def get_hackathon_overview(
     )
 
     dashboard = await dashboard_service.get_hackathon_overview(
-        zerodb=zerodb,
+        zerodb_client=zerodb,
         hackathon_id=hackathon_id,
         user_id=current_user["id"],
     )
