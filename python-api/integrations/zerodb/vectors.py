@@ -55,7 +55,7 @@ class VectorsAPI:
                 namespace="submissions"
             )
         """
-        path = f"/v1/public/projects/{self.client.project_id}/database/vectors/upsert"
+        path = f"/api/v1/projects/{self.client.project_id}/database/vectors/upsert"
         payload = {
             "vector_id": vector_id,
             "embedding": embedding,
@@ -99,7 +99,7 @@ class VectorsAPI:
             ]
             await client.vectors.batch_upsert(vectors, namespace="submissions")
         """
-        path = f"/v1/public/projects/{self.client.project_id}/database/vectors/upsert-batch"
+        path = f"/api/v1/projects/{self.client.project_id}/database/vectors/upsert-batch"
         payload = {"vectors": vectors, "namespace": namespace}
         return await self.client._request("POST", path, json=payload)
 
@@ -133,7 +133,7 @@ class VectorsAPI:
                 similarity_threshold=0.7
             )
         """
-        path = f"/v1/public/projects/{self.client.project_id}/database/vectors/search"
+        path = f"/api/v1/projects/{self.client.project_id}/database/vectors/search"
         payload = {
             "query_vector": query_vector,
             "top_k": top_k,
@@ -158,7 +158,7 @@ class VectorsAPI:
         Returns:
             Dict with deletion confirmation
         """
-        path = f"/v1/public/projects/{self.client.project_id}/database/vectors/{vector_id}"
+        path = f"/api/v1/projects/{self.client.project_id}/database/vectors/{vector_id}"
         params = {"namespace": namespace}
         return await self.client._request("DELETE", path, params=params)
 
@@ -173,7 +173,7 @@ class VectorsAPI:
         Returns:
             Dict with vector details
         """
-        path = f"/v1/public/projects/{self.client.project_id}/database/vectors/{vector_id}"
+        path = f"/api/v1/projects/{self.client.project_id}/database/vectors/{vector_id}"
         params = {"namespace": namespace}
         return await self.client._request("GET", path, params=params)
 
@@ -194,7 +194,7 @@ class VectorsAPI:
         Returns:
             List of vectors
         """
-        path = f"/v1/public/projects/{self.client.project_id}/database/vectors"
+        path = f"/api/v1/projects/{self.client.project_id}/database/vectors"
         params = {"namespace": namespace, "skip": skip, "limit": limit}
         response = await self.client._request("GET", path, params=params)
         return response.get("vectors", [])

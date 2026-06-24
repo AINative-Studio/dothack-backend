@@ -167,7 +167,7 @@ class ZeroDBClient:
 
         Args:
             method: HTTP method (GET, POST, PUT, DELETE)
-            path: API path (e.g., "/v1/public/projects/{id}")
+            path: API path (e.g., "/api/v1/projects/{id}")
             **kwargs: Additional arguments passed to httpx.request
 
         Returns:
@@ -255,7 +255,7 @@ class ZeroDBClient:
             ZeroDBNotFound: If project doesn't exist
             ZeroDBError: For other errors
         """
-        path = f"/v1/public/projects/{self.project_id}"
+        path = f"/api/v1/projects/{self.project_id}"
         return await self._request("GET", path)
 
     async def __aenter__(self):

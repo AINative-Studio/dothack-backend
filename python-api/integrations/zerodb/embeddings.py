@@ -48,7 +48,7 @@ class EmbeddingsAPI:
                 "AI-powered chatbot for customer support"
             ])
         """
-        path = f"/v1/public/projects/{self.client.project_id}/embeddings/generate"
+        path = f"/api/v1/projects/{self.client.project_id}/embeddings/generate"
         payload = {"texts": texts}
 
         response = await self.client._request("POST", path, json=payload)
@@ -91,7 +91,7 @@ class EmbeddingsAPI:
                 namespace="hackathons/hack-456/submissions"
             )
         """
-        path = f"/v1/public/projects/{self.client.project_id}/embeddings/embed-and-store"
+        path = f"/api/v1/projects/{self.client.project_id}/embeddings/embed-and-store"
         payload = {
             "documents": documents,
             "namespace": namespace,
@@ -140,7 +140,7 @@ class EmbeddingsAPI:
             for result in results:
                 print(f"ID: {result['id']}, Score: {result['score']}")
         """
-        path = f"/v1/public/projects/{self.client.project_id}/embeddings/search"
+        path = f"/api/v1/projects/{self.client.project_id}/embeddings/search"
         payload = {
             "query": query,
             "namespace": namespace,

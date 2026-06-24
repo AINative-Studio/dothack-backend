@@ -54,10 +54,12 @@ class TablesAPI:
             }
             table = await client.tables.create("users", schema)
         """
-        path = f"/v1/public/projects/{self.client.project_id}/database/tables"
-        payload = {"name": name, "schema": schema}
+        path = f"/api/v1/projects/{self.client.project_id}/database/tables"
+        payload = {"table_name": name}
         if description:
             payload["description"] = description
+        if schema:
+            payload["schema_definition"] = schema
 
         return await self.client._request("POST", path, json=payload)
 
@@ -72,10 +74,10 @@ class TablesAPI:
         Returns:
             List of table objects
         """
-        path = f"/v1/public/projects/{self.client.project_id}/database/tables"
+        path = f"/api/v1/projects/{self.client.project_id}/database/tables"
         params = {"skip": skip, "limit": limit}
         response = await self.client._request("GET", path, params=params)
-        return response.get("tables", [])
+        return response.get("data", response.get("tables", []))
 
     async def get(self, table_name: str) -> dict[str, Any]:
         """
@@ -87,7 +89,7 @@ class TablesAPI:
         Returns:
             Dict with table details including schema
         """
-        path = f"/v1/public/projects/{self.client.project_id}/database/tables/{table_name}"
+        path = f"/api/v1/projects/{self.client.project_id}/database/tables/{table_name}"
         return await self.client._request("GET", path)
 
     async def delete(self, table_name: str) -> dict[str, Any]:
@@ -100,7 +102,7 @@ class TablesAPI:
         Returns:
             Dict with deletion confirmation
         """
-        path = f"/v1/public/projects/{self.client.project_id}/database/tables/{table_name}"
+        path = f"/api/v1/projects/{self.client.project_id}/database/tables/{table_name}"
         return await self.client._request("DELETE", path)
 
     async def insert_rows(
@@ -125,9 +127,13 @@ class TablesAPI:
             ]
             result = await client.tables.insert_rows("users", rows)
         """
-        path = f"/v1/public/projects/{self.client.project_id}/database/tables/{table_name}/rows"
-        payload = {"rows": rows}
-        return await self.client._request("POST", path, json=payload)
+        path = f"/api/v1/projects/{self.client.project_id}/database/tables/{table_name}/rows"
+        # Insert rows one at a time (API expects single row_data per request)
+        results = []
+        for row in rows:
+            result = await self.client._request("POST", path, json={"row_data": row})
+            results.append(result)
+        return {"inserted": len(results), "rows": results}
 
     async def query_rows(
         self,
@@ -155,13 +161,22 @@ class TablesAPI:
                 limit=10
             )
         """
-        path = f"/v1/public/projects/{self.client.project_id}/database/tables/{table_name}/rows"
-        params = {"skip": skip, "limit": limit}
+        path = f"/api/v1/projects/{self.client.project_id}/database/tables/{table_name}/query"
+        body: dict[str, Any] = {"skip": skip, "limit": limit}
         if filter:
-            params["filter"] = filter
+            body["filters"] = filter
 
-        response = await self.client._request("GET", path, params=params)
-        return response.get("rows", [])
+        response = await self.client._request("POST", path, json=body)
+        raw_rows = response.get("data", response.get("rows", []))
+        # ZeroDB wraps row data inside row_data field - flatten it
+        result = []
+        for row in raw_rows:
+            if isinstance(row, dict) and "row_data" in row:
+                flat = {**row["row_data"], "_row_id": row.get("row_id"), "_created_at": row.get("created_at")}
+                result.append(flat)
+            else:
+                result.append(row)
+        return result
 
     async def update_row(
         self,
@@ -180,7 +195,7 @@ class TablesAPI:
         Returns:
             Dict with updated row
         """
-        path = f"/v1/public/projects/{self.client.project_id}/database/tables/{table_name}/rows/{row_id}"
+        path = f"/api/v1/projects/{self.client.project_id}/database/tables/{table_name}/rows/{row_id}"
         payload = {"data": data}
         return await self.client._request("PUT", path, json=payload)
 
@@ -195,5 +210,5 @@ class TablesAPI:
         Returns:
             Dict with deletion confirmation
         """
-        path = f"/v1/public/projects/{self.client.project_id}/database/tables/{table_name}/rows/{row_id}"
+        path = f"/api/v1/projects/{self.client.project_id}/database/tables/{table_name}/rows/{row_id}"
         return await self.client._request("DELETE", path)

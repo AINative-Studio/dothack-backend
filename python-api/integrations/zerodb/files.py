@@ -92,7 +92,7 @@ class FilesAPI:
             payload["metadata"] = metadata
 
         # Make API request
-        path = f"/v1/public/projects/{self.client.project_id}/files/upload"
+        path = f"/api/v1/projects/{self.client.project_id}/files/upload"
         return await self.client._request("POST", path, json=payload)
 
     async def generate_presigned_url(
@@ -124,7 +124,7 @@ class FilesAPI:
             >>> )
             >>> download_url = result["url"]
         """
-        path = f"/v1/public/projects/{self.client.project_id}/files/{file_id}/presigned-url"
+        path = f"/api/v1/projects/{self.client.project_id}/files/{file_id}/presigned-url"
         params = {"expiration_seconds": expiration_seconds}
         return await self.client._request("GET", path, params=params)
 
@@ -163,7 +163,7 @@ class FilesAPI:
             >>> for file in result["files"]:
             >>>     print(file["file_name"])
         """
-        path = f"/v1/public/projects/{self.client.project_id}/files"
+        path = f"/api/v1/projects/{self.client.project_id}/files"
         params = {"limit": limit, "offset": offset}
 
         if folder:
@@ -195,7 +195,7 @@ class FilesAPI:
             >>> result = await client.files.delete_file("file_abc123")
             >>> print(result["message"])
         """
-        path = f"/v1/public/projects/{self.client.project_id}/files/{file_id}"
+        path = f"/api/v1/projects/{self.client.project_id}/files/{file_id}"
         return await self.client._request("DELETE", path)
 
     async def get_file_metadata(self, file_id: str) -> Dict[str, Any]:
@@ -223,7 +223,7 @@ class FilesAPI:
             >>> metadata = await client.files.get_file_metadata("file_abc123")
             >>> print(f"Size: {metadata['size']} bytes")
         """
-        path = f"/v1/public/projects/{self.client.project_id}/files/{file_id}/metadata"
+        path = f"/api/v1/projects/{self.client.project_id}/files/{file_id}/metadata"
         return await self.client._request("GET", path)
 
     async def download_file(
@@ -254,6 +254,6 @@ class FilesAPI:
             >>> result = await client.files.download_file("file_abc123")
             >>> content_bytes = base64.b64decode(result["content"])
         """
-        path = f"/v1/public/projects/{self.client.project_id}/files/{file_id}/download"
+        path = f"/api/v1/projects/{self.client.project_id}/files/{file_id}/download"
         params = {"return_base64": return_base64}
         return await self.client._request("GET", path, params=params)

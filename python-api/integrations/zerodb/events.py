@@ -57,7 +57,7 @@ class EventsAPI:
                 correlation_id="correlation-abc"
             )
         """
-        path = f"/v1/public/projects/{self.client.project_id}/database/events"
+        path = f"/api/v1/projects/{self.client.project_id}/database/events"
         payload = {
             "event_type": event_type,
             "data": data,
