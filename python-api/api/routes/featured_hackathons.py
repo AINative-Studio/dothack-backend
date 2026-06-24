@@ -60,9 +60,9 @@ async def list_featured_hackathons(
 
     return FeaturedHackathonListResponse(
         featured_hackathons=[
-            FeaturedHackathonResponse(**fh) for fh in result["featured_hackathons"]
+            FeaturedHackathonResponse(**fh) for fh in result.get("featured", result.get("featured_hackathons", []))
         ],
-        total=result["total"],
+        total=result.get("total", 0),
     )
 
 
