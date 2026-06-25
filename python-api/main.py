@@ -230,6 +230,22 @@ async def validation_exception_handler(
 
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    # Handle ZeroDB rate limit errors with 429 instead of 500
+    from integrations.zerodb.exceptions import ZeroDBRateLimitError
+    if isinstance(exc, ZeroDBRateLimitError):
+        logger.warning(f"Rate limited on {request.url.path}")
+        return JSONResponse(
+            status_code=429,
+            content={
+                "error": {
+                    "status_code": 429,
+                    "message": "Too many requests. Please wait a moment and try again.",
+                    "path": str(request.url.path),
+                    "retry_after": 10,
+                }
+            },
+            headers={"Retry-After": "10"},
+        )
     """
     Handle unexpected exceptions with generic error response.
 

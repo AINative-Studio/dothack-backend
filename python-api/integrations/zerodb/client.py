@@ -188,9 +188,9 @@ class ZeroDBClient:
             raise ZeroDBError(f"Network error: {str(e)}") from e
 
     @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=1, max=10),
-        retry=retry_if_exception_type((httpx.NetworkError, httpx.TimeoutException)),
+        stop=stop_after_attempt(4),
+        wait=wait_exponential(multiplier=2, min=2, max=30),
+        retry=retry_if_exception_type((httpx.NetworkError, httpx.TimeoutException, ZeroDBRateLimitError)),
         reraise=True,
     )
     async def _request_with_retry(
@@ -199,7 +199,7 @@ class ZeroDBClient:
         path: str,
         **kwargs,
     ) -> dict[str, Any]:
-        """Internal method with retry logic. Lets httpx exceptions propagate for tenacity."""
+        """Internal method with retry logic. Retries on network errors, timeouts, and 429 rate limits."""
         response = await self._http_client.request(method, path, **kwargs)
 
         # Handle error status codes
