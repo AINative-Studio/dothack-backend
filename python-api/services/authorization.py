@@ -162,6 +162,19 @@ async def check_organizer(
         >>> await check_organizer(client, "user-123", "hack-456")
         True
     """
+    # First check if user is the hackathon creator (organizer_id field)
+    try:
+        hackathon_rows = await zerodb_client.tables.query_rows(
+            "hackathons",
+            filter={"hackathon_id": hackathon_id},
+            limit=1,
+        )
+        if hackathon_rows and hackathon_rows[0].get("organizer_id") == user_id:
+            return True
+    except Exception:
+        pass  # Fall through to check_role
+
+    # Fall back to checking hackathon_participants table
     return await check_role(
         zerodb_client=zerodb_client,
         user_id=user_id,
