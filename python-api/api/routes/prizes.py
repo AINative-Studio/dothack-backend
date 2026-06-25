@@ -76,7 +76,7 @@ async def create_prize(
         409: If rank already exists for the same scope
     """
     # Verify user is organizer
-    await check_organizer(hackathon_id, current_user["id"], zerodb)
+    await check_organizer(zerodb, current_user["id"], hackathon_id)
 
     logger.info(
         f"User {current_user['id']} creating prize '{request.title}' "
@@ -226,7 +226,7 @@ async def update_prize(
         409: If rank conflicts
     """
     # Verify user is organizer
-    await check_organizer(hackathon_id, current_user["id"], zerodb)
+    await check_organizer(zerodb, current_user["id"], hackathon_id)
 
     logger.info(f"User {current_user['id']} updating prize {prize_id}")
 
@@ -282,7 +282,7 @@ async def delete_prize(
         404: If prize not found
     """
     # Verify user is organizer
-    await check_organizer(hackathon_id, current_user["id"], zerodb)
+    await check_organizer(zerodb, current_user["id"], hackathon_id)
 
     logger.info(f"User {current_user['id']} deleting prize {prize_id}")
 

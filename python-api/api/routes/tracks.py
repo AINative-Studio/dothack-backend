@@ -74,7 +74,7 @@ async def create_track(
         409: If track name already exists
     """
     # Verify user is organizer
-    await check_organizer(hackathon_id, current_user["id"], zerodb)
+    await check_organizer(zerodb, current_user["id"], hackathon_id)
 
     logger.info(
         f"User {current_user['id']} creating track '{request.name}' "
@@ -205,7 +205,7 @@ async def update_track(
         409: If name conflicts
     """
     # Verify user is organizer
-    await check_organizer(hackathon_id, current_user["id"], zerodb)
+    await check_organizer(zerodb, current_user["id"], hackathon_id)
 
     logger.info(f"User {current_user['id']} updating track {track_id}")
 
@@ -261,7 +261,7 @@ async def delete_track(
         409: If track has teams assigned
     """
     # Verify user is organizer
-    await check_organizer(hackathon_id, current_user["id"], zerodb)
+    await check_organizer(zerodb, current_user["id"], hackathon_id)
 
     logger.info(f"User {current_user['id']} deleting track {track_id}")
 
