@@ -164,7 +164,20 @@ class TablesAPI:
         path = f"/api/v1/projects/{self.client.project_id}/database/tables/{table_name}/query"
         body: dict[str, Any] = {"skip": skip, "limit": limit}
         if filter:
-            body["filters"] = filter
+            # ZeroDB stores all values as text in JSONB - convert to strings
+            # and remove None values (ZeroDB can't filter IS NULL this way)
+            clean_filter = {}
+            for k, v in filter.items():
+                if v is None:
+                    continue  # Skip null filters
+                elif isinstance(v, bool):
+                    clean_filter[k] = v  # Booleans work as-is
+                elif isinstance(v, (int, float)):
+                    clean_filter[k] = str(v)  # Convert numbers to strings
+                else:
+                    clean_filter[k] = v
+            if clean_filter:
+                body["filters"] = clean_filter
 
         response = await self.client._request("POST", path, json=body)
         raw_rows = response.get("data", response.get("rows", []))
