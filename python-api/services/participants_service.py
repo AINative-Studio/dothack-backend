@@ -242,9 +242,25 @@ class ParticipantsService:
                 limit=1000,  # Reasonable limit for most hackathons
             )
 
-            # Enrich with email and name from metadata
+            # Enrich with email/name from metadata and map ZeroDB row fields
             for participant in participants:
+                # Map _row_id to id if id is missing
+                if not participant.get("id") and participant.get("_row_id"):
+                    participant["id"] = participant["_row_id"]
+                # Map _created_at to joined_at if joined_at is missing
+                if not participant.get("joined_at") and participant.get("_created_at"):
+                    participant["joined_at"] = participant["_created_at"]
+                # Ensure hackathon_id is present
+                if not participant.get("hackathon_id"):
+                    participant["hackathon_id"] = hackathon_id
+                # Handle metadata - might be a string from ZeroDB
                 metadata = participant.get("metadata", {})
+                if isinstance(metadata, str):
+                    import json as _json
+                    try:
+                        metadata = _json.loads(metadata)
+                    except (ValueError, TypeError):
+                        metadata = {}
                 participant["email"] = metadata.get("ainative_user_email")
                 participant["name"] = metadata.get("ainative_user_name")
 

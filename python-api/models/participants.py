@@ -40,15 +40,15 @@ class InviteJudgesRequest(BaseModel):
 class ParticipantResponse(BaseModel):
     """Participant information response."""
 
-    id: str = Field(..., description="Participant record ID")
-    participant_id: str = Field(..., description="User participant ID")
-    hackathon_id: str = Field(..., description="Hackathon ID")
+    id: Optional[str] = Field(None, description="Participant record ID")
+    participant_id: Optional[str] = Field(None, description="User participant ID")
+    hackathon_id: Optional[str] = Field(None, description="Hackathon ID")
     role: Literal["BUILDER", "ORGANIZER", "JUDGE", "MENTOR"] = Field(
         ..., description="Participant role"
     )
     email: Optional[EmailStr] = Field(None, description="Participant email")
     name: Optional[str] = Field(None, description="Participant name")
-    joined_at: str = Field(..., description="ISO timestamp when joined")
+    joined_at: Optional[str] = Field(None, description="ISO timestamp when joined")
     metadata: Optional[dict] = Field(None, description="Additional metadata")
 
 
