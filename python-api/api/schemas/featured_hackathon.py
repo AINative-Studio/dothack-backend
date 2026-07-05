@@ -97,13 +97,13 @@ class FeaturedHackathonResponse(BaseModel):
         updated_at: Last update timestamp
         hackathon: Optional nested hackathon details
     """
-    id: str
-    hackathon_id: str
-    display_order: int
+    id: Optional[str] = None
+    hackathon_id: Optional[str] = None
+    display_order: Optional[int] = None
     featured_until: Optional[str] = None
-    is_active: bool
-    created_at: str
-    updated_at: str
+    is_active: Optional[bool] = True
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
     hackathon: Optional[dict] = Field(None, description="Nested hackathon details")
 
     model_config = ConfigDict(from_attributes=True)

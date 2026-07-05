@@ -219,10 +219,13 @@ class PrizeService:
         """
         try:
             # Verify hackathon exists
-            hackathons = await self.zerodb.tables.query_rows(
-                "hackathons",
-                filter={"hackathon_id": hackathon_id, "is_deleted": False},
-            )
+            try:
+                hackathons = await self.zerodb.tables.query_rows(
+                    "hackathons",
+                    filter={"hackathon_id": hackathon_id, "is_deleted": False},
+                )
+            except ZeroDBNotFound:
+                hackathons = []
 
             if not hackathons:
                 logger.warning(f"Hackathon {hackathon_id} not found")
@@ -240,20 +243,58 @@ class PrizeService:
             if rank is not None:
                 prize_filter["rank"] = rank
 
-            # Query prizes
-            prizes = await self.zerodb.tables.query_rows(
-                "prizes",
-                filter=prize_filter,
-            )
+            # Query prizes - handle table not found gracefully
+            try:
+                prizes = await self.zerodb.tables.query_rows(
+                    "prizes",
+                    filter=prize_filter,
+                )
+            except ZeroDBNotFound:
+                # Prizes table doesn't exist yet - return empty list
+                logger.info("prizes table not found, returning empty list")
+                return {
+                    "prizes": [],
+                    "total": 0,
+                    "hackathon_id": hackathon_id,
+                    "total_prize_pool": None,
+                }
 
-            # Parse datetime strings and amounts
+            # Parse datetime strings and amounts, map ZeroDB fields
             for prize in prizes:
+                # Map _row_id to prize_id if prize_id is missing
+                if not prize.get("prize_id") and prize.get("_row_id"):
+                    prize["prize_id"] = prize["_row_id"]
+                # Map _created_at to created_at if created_at is missing
+                if not prize.get("created_at") and prize.get("_created_at"):
+                    prize["created_at"] = prize["_created_at"]
+                # Ensure updated_at has a value
+                if not prize.get("updated_at"):
+                    prize["updated_at"] = prize.get("created_at", datetime.utcnow().isoformat())
+                # Ensure hackathon_id is present
+                if not prize.get("hackathon_id"):
+                    prize["hackathon_id"] = hackathon_id
+                # Default display_order to rank if missing
+                if prize.get("display_order") is None and prize.get("rank") is not None:
+                    prize["display_order"] = prize["rank"]
+                # Default currency if missing
+                if not prize.get("currency"):
+                    prize["currency"] = "USD"
+
                 if "created_at" in prize and isinstance(prize["created_at"], str):
-                    prize["created_at"] = datetime.fromisoformat(prize["created_at"])
+                    try:
+                        prize["created_at"] = datetime.fromisoformat(prize["created_at"])
+                    except (ValueError, TypeError):
+                        prize["created_at"] = datetime.utcnow()
                 if "updated_at" in prize and isinstance(prize["updated_at"], str):
-                    prize["updated_at"] = datetime.fromisoformat(prize["updated_at"])
+                    try:
+                        prize["updated_at"] = datetime.fromisoformat(prize["updated_at"])
+                    except (ValueError, TypeError):
+                        prize["updated_at"] = datetime.utcnow()
                 if "amount" in prize and prize["amount"] is not None:
-                    prize["amount"] = Decimal(str(prize["amount"]))
+                    try:
+                        prize["amount"] = Decimal(str(prize["amount"]))
+                    except Exception:
+                        prize["amount"] = None
 
             # Sort by display_order, then rank
             prizes.sort(key=lambda x: (x.get("display_order", 999), x.get("rank", 999)))
@@ -288,7 +329,7 @@ class PrizeService:
                 detail="Request timed out. Please try again.",
             )
 
-        except (ZeroDBError, ZeroDBNotFound) as e:
+        except ZeroDBError as e:
             logger.error(f"Database error listing prizes: {str(e)}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

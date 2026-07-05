@@ -12,6 +12,7 @@ from uuid import uuid4
 from fastapi import HTTPException, status
 
 from integrations.zerodb.client import ZeroDBClient
+from integrations.zerodb.exceptions import ZeroDBNotFound
 
 
 logger = logging.getLogger(__name__)
@@ -44,6 +45,10 @@ async def get_featured_by_hackathon_id(
             if exclude_id and featured.get("id") == exclude_id:
                 return None
             return featured
+        return None
+
+    except ZeroDBNotFound:
+        # Table doesn't exist yet - no duplicate possible
         return None
 
     except Exception as e:
@@ -299,6 +304,17 @@ async def list_featured(zerodb: ZeroDBClient, include_hackathon_details: bool = 
             "featured": active_featured,
             "total": len(active_featured)
         }
+
+    except ZeroDBNotFound:
+        # Table doesn't exist yet - return empty list gracefully
+        logger.info("featured_hackathons table not found, returning empty list")
+        return {
+            "featured": [],
+            "total": 0
+        }
+
+    except HTTPException:
+        raise
 
     except Exception as e:
         logger.error(f"Error listing featured hackathons: {str(e)}")

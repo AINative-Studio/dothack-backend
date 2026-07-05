@@ -8,6 +8,7 @@ import logging
 from typing import Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import ValidationError
 
 from api.dependencies import get_current_user, get_zerodb_client
 from api.schemas.prize import (
@@ -140,9 +141,17 @@ async def list_prizes(
         rank=rank,
     )
 
+    prize_models = []
+    for prize in result["prizes"]:
+        try:
+            prize_models.append(PrizeResponse(**prize))
+        except (ValidationError, Exception) as e:
+            logger.warning(f"Skipping prize with invalid data: {e}")
+            continue
+
     return PrizeListResponse(
-        prizes=[PrizeResponse(**prize) for prize in result["prizes"]],
-        total=result["total"],
+        prizes=prize_models,
+        total=len(prize_models),
         hackathon_id=result["hackathon_id"],
         total_prize_pool=result.get("total_prize_pool"),
     )

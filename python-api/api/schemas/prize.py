@@ -129,18 +129,18 @@ class PrizeResponse(BaseModel):
         created_at: Creation timestamp
         updated_at: Last update timestamp
     """
-    prize_id: str
-    hackathon_id: str
-    title: str
-    description: Optional[str]
-    amount: Optional[Decimal]
-    currency: str
-    rank: int
-    track_id: Optional[str]
-    sponsor_name: Optional[str]
-    display_order: int
-    created_at: datetime
-    updated_at: datetime
+    prize_id: Optional[str] = None
+    hackathon_id: Optional[str] = None
+    title: Optional[str] = None
+    description: Optional[str] = None
+    amount: Optional[Decimal] = None
+    currency: Optional[str] = "USD"
+    rank: Optional[int] = None
+    track_id: Optional[str] = None
+    sponsor_name: Optional[str] = None
+    display_order: Optional[int] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
 

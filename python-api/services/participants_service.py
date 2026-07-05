@@ -11,7 +11,7 @@ from uuid import uuid4
 
 from fastapi import HTTPException, status
 from integrations.zerodb.client import ZeroDBClient
-from integrations.zerodb.exceptions import ZeroDBError
+from integrations.zerodb.exceptions import ZeroDBError, ZeroDBNotFound
 
 logger = logging.getLogger(__name__)
 
@@ -253,6 +253,9 @@ class ParticipantsService:
                 # Ensure hackathon_id is present
                 if not participant.get("hackathon_id"):
                     participant["hackathon_id"] = hackathon_id
+                # Ensure role has a default if missing
+                if not participant.get("role"):
+                    participant["role"] = "BUILDER"
                 # Handle metadata - might be a string from ZeroDB
                 metadata = participant.get("metadata", {})
                 if isinstance(metadata, str):
@@ -269,6 +272,11 @@ class ParticipantsService:
             )
 
             return participants
+
+        except ZeroDBNotFound:
+            # Table doesn't exist yet - return empty list gracefully
+            logger.info("hackathon_participants table not found, returning empty list")
+            return []
 
         except ZeroDBError as e:
             logger.error(f"Database error listing participants: {e}")

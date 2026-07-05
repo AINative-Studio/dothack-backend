@@ -172,22 +172,22 @@ class HackathonResponse(BaseModel):
     """
     hackathon_id: str
     name: str
-    description: Optional[str]
-    organizer_id: str
-    start_date: datetime
-    end_date: datetime
-    registration_deadline: Optional[datetime]
-    max_participants: Optional[int]
-    location: str
-    website_url: Optional[str]
-    logo_url: Optional[str]
-    is_online: bool
-    participant_count: int
-    prizes: Optional[dict]
-    rules: Optional[str]
-    status: str
-    created_at: datetime
-    updated_at: datetime
+    description: Optional[str] = None
+    organizer_id: Optional[str] = None
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+    registration_deadline: Optional[datetime] = None
+    max_participants: Optional[int] = None
+    location: Optional[str] = None
+    website_url: Optional[str] = None
+    logo_url: Optional[str] = None
+    is_online: Optional[bool] = False
+    participant_count: Optional[int] = 0
+    prizes: Optional[dict] = None
+    rules: Optional[str] = None
+    status: Optional[str] = "DRAFT"
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
 

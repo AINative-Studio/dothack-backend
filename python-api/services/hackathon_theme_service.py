@@ -13,6 +13,7 @@ from uuid import uuid4
 from fastapi import HTTPException, status
 
 from integrations.zerodb.client import ZeroDBClient
+from integrations.zerodb.exceptions import ZeroDBNotFound
 
 
 logger = logging.getLogger(__name__)
@@ -46,6 +47,10 @@ async def get_theme_by_name(
             if exclude_id and theme.get("id") == exclude_id:
                 return None
             return theme
+        return None
+
+    except ZeroDBNotFound:
+        # Table doesn't exist yet - no duplicate possible
         return None
 
     except Exception as e:
@@ -82,6 +87,10 @@ async def get_next_display_order(zerodb: ZeroDBClient) -> int:
             default=0
         )
         return max_order + 1
+
+    except ZeroDBNotFound:
+        # Table doesn't exist yet
+        return 1
 
     except Exception as e:
         logger.error(f"Error getting next display order: {str(e)}")
@@ -221,6 +230,17 @@ async def list_themes(zerodb: ZeroDBClient) -> Dict:
             "themes": themes,
             "total": len(themes)
         }
+
+    except ZeroDBNotFound:
+        # Table doesn't exist yet - return empty list gracefully
+        logger.info("hackathon_themes table not found, returning empty list")
+        return {
+            "themes": [],
+            "total": 0
+        }
+
+    except HTTPException:
+        raise
 
     except Exception as e:
         logger.error(f"Error listing themes: {str(e)}")

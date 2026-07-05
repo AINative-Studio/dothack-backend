@@ -87,15 +87,15 @@ class HackathonThemeResponse(BaseModel):
         created_at: Creation timestamp
         updated_at: Last update timestamp
     """
-    id: str
-    theme_name: str
+    id: Optional[str] = None
+    theme_name: Optional[str] = None
     description: Optional[str] = None
     icon: Optional[str] = None
-    hackathon_count: int = Field(default=0, description="Number of hackathons")
-    total_prizes: Decimal = Field(default=Decimal("0.00"), description="Total prize pool")
-    display_order: int
-    created_at: str
-    updated_at: str
+    hackathon_count: Optional[int] = Field(default=0, description="Number of hackathons")
+    total_prizes: Optional[Decimal] = Field(default=Decimal("0.00"), description="Total prize pool")
+    display_order: Optional[int] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 

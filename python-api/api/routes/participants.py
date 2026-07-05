@@ -19,6 +19,7 @@ from models.participants import (
     ListParticipantsResponse,
     ParticipantResponse,
 )
+from pydantic import ValidationError
 from services.authorization import check_organizer
 from services.participants_service import ParticipantsService
 
@@ -158,7 +159,15 @@ async def list_participants(
         role=role,
     )
 
-    participant_models = [ParticipantResponse(**p) for p in participants]
+    participant_models = []
+    for p in participants:
+        try:
+            participant_models.append(ParticipantResponse(**p))
+        except (ValidationError, Exception) as e:
+            logger.warning(
+                f"Skipping participant with invalid data: {e}"
+            )
+            continue
 
     return ListParticipantsResponse(
         hackathon_id=str(hackathon_id),
