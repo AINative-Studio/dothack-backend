@@ -74,7 +74,7 @@ class PrizeService:
             # Verify hackathon exists
             hackathons = await self.zerodb.tables.query_rows(
                 "hackathons",
-                filter={"hackathon_id": hackathon_id, "is_deleted": False},
+                filter={"hackathon_id": hackathon_id},
             )
 
             if not hackathons:
@@ -222,7 +222,7 @@ class PrizeService:
             try:
                 hackathons = await self.zerodb.tables.query_rows(
                     "hackathons",
-                    filter={"hackathon_id": hackathon_id, "is_deleted": False},
+                    filter={"hackathon_id": hackathon_id},
                 )
             except ZeroDBNotFound:
                 hackathons = []
