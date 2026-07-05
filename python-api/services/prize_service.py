@@ -218,21 +218,20 @@ class PrizeService:
             HTTPException: 504 for timeout errors
         """
         try:
-            # Verify hackathon exists
+            # Verify hackathon exists (skip if table not found)
             try:
                 hackathons = await self.zerodb.tables.query_rows(
                     "hackathons",
                     filter={"hackathon_id": hackathon_id},
                 )
+                if not hackathons:
+                    logger.warning(f"Hackathon {hackathon_id} not found")
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail=f"Hackathon {hackathon_id} not found",
+                    )
             except ZeroDBNotFound:
-                hackathons = []
-
-            if not hackathons:
-                logger.warning(f"Hackathon {hackathon_id} not found")
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Hackathon {hackathon_id} not found",
-                )
+                logger.info(f"hackathons table not found, skipping verification")
 
             # Build query filter
             prize_filter: Dict = {"hackathon_id": hackathon_id}
