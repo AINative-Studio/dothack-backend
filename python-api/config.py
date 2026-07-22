@@ -64,6 +64,15 @@ class Settings(BaseSettings):
     RESEND_API_URL: str = Field(default="https://api.resend.com", description="Resend API base URL")
     RESEND_API_KEY: str = Field(default="", description="Resend API key")
 
+    # Encryption
+    ENCRYPTION_MASTER_KEY: str = Field(default="", description="Fernet master key for encrypting integration secrets")
+
+    # Luma Integration
+    LUMA_API_BASE_URL: str = Field(default="https://public-api.luma.com", description="Luma API base URL")
+
+    # ZeroPipeline CRM Integration
+    ZEROPIPELINE_API_BASE_URL: str = Field(default="https://pipeline.ainative.studio/api/v1", description="ZeroPipeline CRM API base URL")
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

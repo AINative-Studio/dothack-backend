@@ -24,6 +24,7 @@ from api.routes import (
     files,
     hackathons,
     hackathon_themes,
+    integrations,
     invitations,
     judging,
     participants,
@@ -35,6 +36,7 @@ from api.routes import (
     submissions,
     teams,
     tracks,
+    zeropipeline,
 )
 from config import settings
 from fastapi import FastAPI, Request, status
@@ -143,6 +145,8 @@ app.include_router(export.router)
 app.include_router(search.router)
 app.include_router(recommendations.router)
 app.include_router(files.router)
+app.include_router(integrations.router)
+app.include_router(zeropipeline.router)
 
 logger.info("Registered hackathon CRUD routes")
 logger.info("Registered hackathon theme routes")
@@ -162,6 +166,8 @@ logger.info("Registered export routes")
 logger.info("Registered search routes")
 logger.info("Registered recommendations routes")
 logger.info("Registered file upload routes")
+logger.info("Registered integrations routes")
+logger.info("Registered ZeroPipeline CRM integration routes")
 
 
 # Global Exception Handlers
